@@ -25,14 +25,14 @@ export default function TimelineItem({ item, onChange, onRemove }) {
           ⠿
         </button>
         <div className="text-center min-w-[72px]">
-          <div className="text-sm font-bold text-ocar">{timingLabel(item) || '—'}</div>
+          <div className="text-sm font-bold text-ocar"><bdi>{timingLabel(item) || '—'}</bdi></div>
           {item.approx_duration_hours ? (
             <div className="text-[11px] text-slate-400">{formatDuration(item.approx_duration_hours)}</div>
           ) : null}
         </div>
         <div className="flex-1 min-w-0">
           <div className="font-semibold truncate">{item.title}</div>
-          {item.description && <div className="text-xs text-slate-500 truncate">{item.description}</div>}
+          {item.description && <div className="text-xs text-slate-500 line-clamp-2 break-words">{item.description}</div>}
         </div>
         {item.photos?.length > 0 && (
           <img src={item.photos[0]} alt="" className="h-10 w-10 rounded object-cover" />
@@ -41,7 +41,7 @@ export default function TimelineItem({ item, onChange, onRemove }) {
           {item.show_price === false ? (
             <span className="text-slate-300">ללא מחיר</span>
           ) : (
-            formatPrice(item.price_min, item.price_max) || '—'
+            formatPrice(item.price) || '—'
           )}
         </div>
         <button onClick={() => setOpen((o) => !o)} className="text-slate-400 hover:text-ocar text-sm px-2">
@@ -53,14 +53,19 @@ export default function TimelineItem({ item, onChange, onRemove }) {
       {open && (
         <div className="border-t border-slate-100 p-4 space-y-3">
           <input className={field} value={item.title} onChange={(e) => set({ title: e.target.value })} placeholder="שם הפעילות" />
-          <textarea className={field} rows={2} value={item.description || ''}
+          <textarea className={field} rows={4} value={item.description || ''}
             onChange={(e) => set({ description: e.target.value })} placeholder="תיאור" />
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <label className="text-xs text-slate-500">
-              שעה משוערת
+              שעת התחלה
               <input className={field} value={item.approx_start || ''} placeholder="למשל 09:00"
                 onChange={(e) => set({ approx_start: e.target.value })} />
+            </label>
+            <label className="text-xs text-slate-500">
+              שעת סיום
+              <input className={field} value={item.approx_end || ''} placeholder="למשל 14:00"
+                onChange={(e) => set({ approx_end: e.target.value })} />
             </label>
             <label className="text-xs text-slate-500">
               משך (שעות)
@@ -93,14 +98,9 @@ export default function TimelineItem({ item, onChange, onRemove }) {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
             <label className="text-xs text-slate-500">
-              מחיר מ־ (₪)
-              <input type="number" className={field} value={item.price_min ?? ''}
-                onChange={(e) => set({ price_min: e.target.value ? Number(e.target.value) : null })} />
-            </label>
-            <label className="text-xs text-slate-500">
-              מחיר עד (₪)
-              <input type="number" className={field} value={item.price_max ?? ''}
-                onChange={(e) => set({ price_max: e.target.value ? Number(e.target.value) : null })} />
+              מחיר (₪)
+              <input type="number" className={field} value={item.price ?? ''}
+                onChange={(e) => set({ price: e.target.value ? Number(e.target.value) : null })} />
             </label>
             <label className="text-xs text-slate-500 flex items-center gap-2 pb-1">
               <input type="checkbox" checked={item.show_price !== false}

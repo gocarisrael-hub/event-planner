@@ -7,7 +7,7 @@ import { formatDuration, formatPrice } from '../utils/format.js';
 const field = 'w-full border border-slate-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-ocar';
 const blank = {
   title: '', description: '', category: '',
-  default_duration_hours: '', default_price_min: '', default_price_max: '',
+  default_duration_hours: '', default_price: '',
   contact_name: '', contact_phone: '', photos: [],
 };
 
@@ -23,8 +23,7 @@ export default function Catalog() {
   const numify = (d) => ({
     ...d,
     default_duration_hours: d.default_duration_hours ? Number(d.default_duration_hours) : null,
-    default_price_min: d.default_price_min ? Number(d.default_price_min) : null,
-    default_price_max: d.default_price_max ? Number(d.default_price_max) : null,
+    default_price: d.default_price ? Number(d.default_price) : null,
   });
 
   const save = async () => {
@@ -52,15 +51,13 @@ export default function Catalog() {
             onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
           <CategorySelect value={draft.category} onChange={(category) => setDraft({ ...draft, category })} />
         </div>
-        <input className={field} placeholder="תיאור" value={draft.description}
+        <textarea className={field} rows={3} placeholder="תיאור" value={draft.description}
           onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <input type="number" step="0.5" min="0" className={field} placeholder="משך (שעות)" value={draft.default_duration_hours}
             onChange={(e) => setDraft({ ...draft, default_duration_hours: e.target.value })} />
-          <input type="number" className={field} placeholder="מחיר מ־" value={draft.default_price_min}
-            onChange={(e) => setDraft({ ...draft, default_price_min: e.target.value })} />
-          <input type="number" className={field} placeholder="מחיר עד" value={draft.default_price_max}
-            onChange={(e) => setDraft({ ...draft, default_price_max: e.target.value })} />
+          <input type="number" className={field} placeholder="מחיר (₪)" value={draft.default_price}
+            onChange={(e) => setDraft({ ...draft, default_price: e.target.value })} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <input className={field} placeholder="איש קשר" value={draft.contact_name}
@@ -96,16 +93,14 @@ export default function Catalog() {
             {editing === c.id ? (
               <div className="space-y-2">
                 <input className={field} value={c.title} onChange={(e) => updateCatalog(c.id, { title: e.target.value })} />
-                <input className={field} value={c.description || ''} placeholder="תיאור"
+                <textarea className={field} rows={3} value={c.description || ''} placeholder="תיאור"
                   onChange={(e) => updateCatalog(c.id, { description: e.target.value })} />
                 <CategorySelect value={c.category} onChange={(category) => updateCatalog(c.id, { category })} />
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <input type="number" step="0.5" min="0" className={field} value={c.default_duration_hours ?? ''} placeholder="שעות"
                     onChange={(e) => updateCatalog(c.id, { default_duration_hours: e.target.value ? Number(e.target.value) : null })} />
-                  <input type="number" className={field} value={c.default_price_min ?? ''} placeholder="מ־"
-                    onChange={(e) => updateCatalog(c.id, { default_price_min: e.target.value ? Number(e.target.value) : null })} />
-                  <input type="number" className={field} value={c.default_price_max ?? ''} placeholder="עד"
-                    onChange={(e) => updateCatalog(c.id, { default_price_max: e.target.value ? Number(e.target.value) : null })} />
+                  <input type="number" className={field} value={c.default_price ?? ''} placeholder="מחיר (₪)"
+                    onChange={(e) => updateCatalog(c.id, { default_price: e.target.value ? Number(e.target.value) : null })} />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <input className={field} value={c.contact_name || ''} placeholder="איש קשר"
@@ -131,7 +126,7 @@ export default function Catalog() {
                 {c.description && <p className="text-sm text-slate-500 mt-1">{c.description}</p>}
                 <div className="flex gap-2 mt-2 text-xs text-slate-400 flex-wrap">
                   {formatDuration(c.default_duration_hours) && <span>{formatDuration(c.default_duration_hours)}</span>}
-                  {formatPrice(c.default_price_min, c.default_price_max) && <span>{formatPrice(c.default_price_min, c.default_price_max)}</span>}
+                  {formatPrice(c.default_price) && <span>{formatPrice(c.default_price)}</span>}
                   {c.contact_name && <span>· {c.contact_name}</span>}
                   {c.contact_phone && <span>· {c.contact_phone}</span>}
                 </div>

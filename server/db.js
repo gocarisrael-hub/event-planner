@@ -32,8 +32,7 @@ function seed() {
         description: 'ארוחת בוקר בופה עשירה לפתיחת היום',
         category: 'אוכל',
         default_duration_hours: 1,
-        default_price_min: 45,
-        default_price_max: 60,
+        default_price: 45,
         contact_name: 'קייטרינג בוקר טוב',
         contact_phone: '',
         photos: [],
@@ -45,8 +44,7 @@ function seed() {
         description: 'טיול מודרך עם ציפה בים המלח',
         category: 'אטרקציה',
         default_duration_hours: 3,
-        default_price_min: 120,
-        default_price_max: 160,
+        default_price: 120,
         contact_name: 'סיורי ים המלח',
         contact_phone: '',
         photos: [],
@@ -58,6 +56,33 @@ function seed() {
   };
 }
 
+// In-place migration of legacy price-range fields to a single price.
+// Returns true if anything changed.
+function migrate(d) {
+  let changed = false;
+  for (const c of d.catalog || []) {
+    if ('default_price_min' in c || 'default_price_max' in c) {
+      if (c.default_price === undefined) {
+        c.default_price = c.default_price_min ?? c.default_price_max ?? null;
+      }
+      delete c.default_price_min;
+      delete c.default_price_max;
+      changed = true;
+    }
+  }
+  for (const it of d.items || []) {
+    if ('price_min' in it || 'price_max' in it) {
+      if (it.price === undefined) {
+        it.price = it.price_min ?? it.price_max ?? null;
+      }
+      delete it.price_min;
+      delete it.price_max;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 function load() {
   if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
   if (!existsSync(DATA_FILE)) {
@@ -66,8 +91,14 @@ function load() {
     return initial;
   }
   try {
-    const parsed = JSON.parse(readFileSync(DATA_FILE, 'utf8'));
-    return { ...EMPTY, ...parsed };
+    const raw = readFileSync(DATA_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    const data = { ...EMPTY, ...parsed };
+    if (migrate(data)) {
+      writeFileSync(`${DATA_FILE}.bak`, raw);
+      writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    }
+    return data;
   } catch {
     return seed();
   }
