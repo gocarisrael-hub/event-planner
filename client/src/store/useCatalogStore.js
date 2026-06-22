@@ -3,20 +3,18 @@ import { api } from '../api/client.js';
 
 export const useCatalogStore = create((set, get) => ({
   catalog: [],
-  vendors: [],
+  categories: [],
   loaded: false,
 
   load: async () => {
-    const [catalog, vendors] = await Promise.all([api.listCatalog(), api.listVendors()]);
-    set({ catalog, vendors, loaded: true });
+    const [catalog, categories] = await Promise.all([api.listCatalog(), api.listCategories()]);
+    set({ catalog, categories, loaded: true });
   },
 
   refresh: async () => {
     const catalog = await api.listCatalog();
     set({ catalog });
   },
-
-  vendorName: (id) => get().vendors.find((v) => v.id === id)?.name || '',
 
   addCatalog: async (data) => {
     const row = await api.createCatalog(data);
@@ -32,17 +30,16 @@ export const useCatalogStore = create((set, get) => ({
     set({ catalog: get().catalog.filter((c) => c.id !== id) });
   },
 
-  addVendor: async (data) => {
-    const row = await api.createVendor(data);
-    set({ vendors: [...get().vendors, row] });
+  // Defined category list (editable; used for selection + later filtering).
+  addCategory: async (name) => {
+    const row = await api.createCategory(name);
+    if (!get().categories.some((c) => c.id === row.id)) {
+      set({ categories: [...get().categories, row] });
+    }
     return row;
   },
-  updateVendor: async (id, patch) => {
-    const row = await api.updateVendor(id, patch);
-    set({ vendors: get().vendors.map((v) => (v.id === id ? row : v)) });
-  },
-  removeVendor: async (id) => {
-    await api.deleteVendor(id);
-    set({ vendors: get().vendors.filter((v) => v.id !== id) });
+  removeCategory: async (id) => {
+    await api.deleteCategory(id);
+    set({ categories: get().categories.filter((c) => c.id !== id) });
   },
 }));

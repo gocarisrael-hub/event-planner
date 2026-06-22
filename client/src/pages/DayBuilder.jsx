@@ -70,7 +70,7 @@ export default function DayBuilder() {
       </div>
 
       <aside className="space-y-4 lg:sticky lg:top-20">
-        <BudgetMeter items={items} budget={event.budget} />
+        <BudgetMeter items={items} budget={event.budget} groupSize={event.group_size} />
         <Link
           to={`/day/${event.id}/proposal`}
           className="block text-center bg-ocar-dark text-white px-4 py-3 rounded-xl font-medium hover:opacity-90"

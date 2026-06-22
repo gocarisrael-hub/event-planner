@@ -7,20 +7,19 @@ export function formatPrice(min, max) {
   return `₪${has(min) ? min : max}`;
 }
 
-export function formatDuration(min) {
-  if (!min) return '';
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  if (h && m) return `${h} ש' ${m} דק'`;
-  if (h) return `${h} ש'`;
-  return `${m} דק'`;
+export function formatDuration(hours) {
+  if (hours === null || hours === undefined || hours === '' || Number(hours) === 0) return '';
+  const h = Number(hours);
+  if (h === 1) return 'שעה';
+  if (h === 2) return 'שעתיים';
+  return `${h} שעות`;
 }
 
 // What to show on the timeline for an item's timing.
 export function timingLabel(item) {
   if (item.approx_start) return item.approx_start;
   if (item.time_note) return item.time_note;
-  if (item.approx_duration_min) return `~${formatDuration(item.approx_duration_min)}`;
+  if (item.approx_duration_hours) return `~${formatDuration(item.approx_duration_hours)}`;
   return '';
 }
 

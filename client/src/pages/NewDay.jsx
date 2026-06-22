@@ -60,9 +60,9 @@ export default function NewDay() {
               onChange={(e) => set('group_size', e.target.value)} placeholder="למשל 40" />
           </label>
           <label className="block">
-            <span className="text-sm font-medium">תקציב (₪)</span>
+            <span className="text-sm font-medium">תקציב לראש (₪)</span>
             <input type="number" className={field} value={form.budget}
-              onChange={(e) => set('budget', e.target.value)} placeholder="סה״כ או לראש" />
+              onChange={(e) => set('budget', e.target.value)} placeholder="כמה לאדם" />
           </label>
         </div>
 

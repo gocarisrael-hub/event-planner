@@ -57,8 +57,8 @@ export default function ProposalPreview() {
             <div key={it.id} className="flex gap-4 print-break border-b border-slate-100 pb-3">
               <div className="min-w-[90px] text-center">
                 <div className="font-bold" style={{ color: brand.colors.primary }}>{timingLabel(it) || '—'}</div>
-                {it.approx_duration_min ? (
-                  <div className="text-xs text-slate-400">{formatDuration(it.approx_duration_min)}</div>
+                {it.approx_duration_hours ? (
+                  <div className="text-xs text-slate-400">{formatDuration(it.approx_duration_hours)}</div>
                 ) : null}
               </div>
               {it.photos?.[0] && (
@@ -76,11 +76,19 @@ export default function ProposalPreview() {
         </div>
 
         {showPrices && (high > 0 || low > 0) && (
-          <div className="mt-6 pt-4 border-t-2 flex justify-between items-center" style={{ borderColor: brand.colors.primary }}>
-            <span className="font-bold text-lg">סה״כ משוער</span>
-            <span className="font-extrabold text-lg" style={{ color: brand.colors.primary }}>
-              {formatPrice(low, high)}
-            </span>
+          <div className="mt-6 pt-4 border-t-2" style={{ borderColor: brand.colors.primary }}>
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-lg">מחיר לאדם</span>
+              <span className="font-extrabold text-lg" style={{ color: brand.colors.primary }}>
+                {formatPrice(low, high)}
+              </span>
+            </div>
+            {event.group_size > 0 && (
+              <div className="flex justify-between items-center text-slate-500 mt-1">
+                <span>סה״כ לקבוצה (×{event.group_size})</span>
+                <span className="font-medium">{formatPrice(low * event.group_size, high * event.group_size)}</span>
+              </div>
+            )}
           </div>
         )}
 

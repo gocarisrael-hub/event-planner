@@ -1,5 +1,6 @@
 // Tiny JSON-file data store. No native deps — safe to install/run anywhere.
-// Collections: vendors, catalog (reusable activities), events (days), items (schedule blocks).
+// Collections: categories (defined list), catalog (reusable activities),
+// events (days), items (schedule blocks).
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -9,37 +10,47 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = join(__dirname, 'data');
 const DATA_FILE = join(DATA_DIR, 'app.json');
 
-const EMPTY = { vendors: [], catalog: [], events: [], items: [] };
+const EMPTY = { categories: [], catalog: [], events: [], items: [] };
+
+const DEFAULT_CATEGORIES = [
+  'אוכל',
+  'אטרקציה',
+  'פעילות שטח',
+  'סדנה',
+  'הרצאה',
+  'לינה',
+  'הסעות',
+];
 
 function seed() {
-  const vBreakfast = { id: randomUUID(), name: 'קייטרינג בוקר טוב', contact: '', notes: '' };
-  const vDeadSea = { id: randomUUID(), name: 'סיורי ים המלח', contact: '', notes: '' };
   return {
-    vendors: [vBreakfast, vDeadSea],
+    categories: DEFAULT_CATEGORIES.map((name) => ({ id: randomUUID(), name })),
     catalog: [
       {
         id: randomUUID(),
         title: 'ארוחת בוקר',
         description: 'ארוחת בוקר בופה עשירה לפתיחת היום',
         category: 'אוכל',
-        default_duration_min: 60,
+        default_duration_hours: 1,
         default_price_min: 45,
         default_price_max: 60,
-        vendor_id: vBreakfast.id,
+        contact_name: 'קייטרינג בוקר טוב',
+        contact_phone: '',
         photos: [],
-        tags: ['בוקר', 'אוכל'],
+        tags: [],
       },
       {
         id: randomUUID(),
         title: 'טיול ים המלח',
         description: 'טיול מודרך עם ציפה בים המלח',
         category: 'אטרקציה',
-        default_duration_min: 180,
+        default_duration_hours: 3,
         default_price_min: 120,
         default_price_max: 160,
-        vendor_id: vDeadSea.id,
+        contact_name: 'סיורי ים המלח',
+        contact_phone: '',
         photos: [],
-        tags: ['טיול', 'מים'],
+        tags: [],
       },
     ],
     events: [],
@@ -96,7 +107,7 @@ function col(name) {
   };
 }
 
-export const vendors = col('vendors');
+export const categories = col('categories');
 export const catalog = col('catalog');
 export const events = col('events');
 export const items = col('items');

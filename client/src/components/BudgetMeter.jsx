@@ -1,30 +1,40 @@
 import { formatPrice, totalRange } from '../utils/format.js';
 
-// Shows the schedule's total price range vs the day's budget.
-export default function BudgetMeter({ items, budget }) {
+// Budget is PER PERSON (לראש). Activity prices are per person too, so the
+// per-head cost compares directly to the budget; the group total is per-head × N.
+export default function BudgetMeter({ items, budget, groupSize }) {
   const { low, high } = totalRange(items);
   const hasBudget = budget !== null && budget !== undefined && budget !== '';
+  const n = Number(groupSize) || 0;
   const over = hasBudget && high > Number(budget);
   const pct = hasBudget ? Math.min(100, Math.round((high / Number(budget)) * 100)) : 0;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4">
       <div className="flex items-center justify-between text-sm">
-        <span className="font-medium">סה״כ משוער</span>
+        <span className="font-medium">עלות לראש</span>
         <span className="font-bold">{formatPrice(low, high) || '—'}</span>
       </div>
+
+      {n > 0 && (high > 0 || low > 0) && (
+        <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
+          <span>סה״כ לקבוצה (×{n})</span>
+          <span>{formatPrice(low * n, high * n)}</span>
+        </div>
+      )}
+
       {hasBudget && (
         <>
-          <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div className="mt-3 h-2 bg-slate-100 rounded-full overflow-hidden">
             <div
               className={`h-full ${over ? 'bg-red-500' : 'bg-ocar'}`}
               style={{ width: `${pct}%` }}
             />
           </div>
           <div className="flex justify-between text-xs text-slate-500 mt-1">
-            <span>תקציב: ₪{budget}</span>
+            <span>תקציב לראש: ₪{budget}</span>
             <span className={over ? 'text-red-500 font-medium' : ''}>
-              {over ? `חריגה של ₪${high - Number(budget)}` : `${pct}% מהתקציב`}
+              {over ? `חריגה של ₪${high - Number(budget)} לראש` : `${pct}% מהתקציב`}
             </span>
           </div>
         </>
