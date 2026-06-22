@@ -77,7 +77,6 @@ router.post('/:id/items', (req, res) => {
     contact_phone: b.contact_phone || '',
     price: b.price ?? null,
     approx_duration_hours: b.approx_duration_hours ?? null,
-    approx_end: b.approx_end || null,
     photos: b.photos || [],
     catalog_activity_id: null,
   };

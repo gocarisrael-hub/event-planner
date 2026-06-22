@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { brand } from '../brand/brand.js';
-import { formatDuration, formatPrice, formatRange, timingLabel, total, whenLabel } from '../utils/format.js';
+import { formatDuration, formatPrice, formatRange, sortByStart, timingLabel, total, whenLabel } from '../utils/format.js';
 
 export default function ProposalPreview() {
   const { id } = useParams();
@@ -20,7 +20,7 @@ export default function ProposalPreview() {
 
   if (!event) return <p className="p-8 text-slate-400">טוען…</p>;
 
-  const items = event.items || [];
+  const items = sortByStart(event.items || []);
   const { low, high } = total(items);
 
   return (

@@ -1,19 +1,12 @@
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { useMemo, useRef, useState } from 'react';
 import { useCatalogStore } from '../store/useCatalogStore.js';
 import { useEventStore } from '../store/useEventStore.js';
-import { formatDuration, formatPrice, formatRange, timingLabel } from '../utils/format.js';
+import { formatPrice } from '../utils/format.js';
+import { DAY_END_MIN, startToMinutes } from '../utils/timeline.js';
 import CategorySelect from './CategorySelect.jsx';
 import PhotoUploader from './PhotoUploader.jsx';
 
 const field = 'w-full border border-slate-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-ocar';
-
-// Per-head price range contributed by a single choice block.
-function optionRange(options) {
-  const prices = options.map((o) => Number(o.price) || 0);
-  return { low: Math.min(...prices), high: Math.max(...prices) };
-}
 
 // Inline "add option" row with catalog autocomplete (mirrors AddActivityRow).
 function AddOptionRow({ onAdd }) {
@@ -85,14 +78,12 @@ function AddOptionRow({ onAdd }) {
   );
 }
 
-// A schedule block. Collapsed = a row in the day; expanded = inline editor.
-export default function TimelineItem({ item, onChange, onRemove }) {
-  const [open, setOpen] = useState(false);
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: item.id,
-  });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
-
+// The activity editor. Opened from a timeline block; rendered as a centered
+// modal panel. Start time is set by dragging the block on the timeline, so
+// there are no start/end fields here — only an explicit duration (which
+// resizes the block) plus description, category, contact, price, photos and
+// alternatives (choice block).
+export default function TimelineItem({ item, onChange, onRemove, onClose }) {
   const set = (patch) => onChange(item.id, patch);
 
   const addOption = useEventStore((s) => s.addOption);
@@ -101,82 +92,52 @@ export default function TimelineItem({ item, onChange, onRemove }) {
 
   const options = item.options || [];
   const hasOptions = options.length > 0;
-  const range = hasOptions ? optionRange(options) : null;
 
   return (
-    <div ref={setNodeRef} style={style} className="bg-white rounded-xl border border-slate-200 print-break">
-      {/* Collapsed header row */}
-      <div className="flex items-center gap-3 p-3">
-        <button {...attributes} {...listeners} className="cursor-grab text-slate-300 hover:text-slate-500 px-1" title="גרור לסידור">
-          ⠿
-        </button>
-        <div className="text-center min-w-[72px]">
-          <div className="text-sm font-bold text-ocar"><bdi>{timingLabel(item) || '—'}</bdi></div>
-          {item.approx_duration_hours ? (
-            <div className="text-[11px] text-slate-400">{formatDuration(item.approx_duration_hours)}</div>
-          ) : null}
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4"
+      onMouseDown={onClose}
+    >
+      <div
+        className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-2xl my-8"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-100 p-4">
+          <div className="font-semibold truncate">{item.title || 'פעילות'}</div>
+          <button onClick={onClose} className="text-slate-400 hover:text-ocar text-sm px-2">
+            סגור
+          </button>
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-semibold truncate flex items-center gap-2">
-            {item.title}
-            {hasOptions && (
-              <span className="text-[11px] font-medium bg-ocar-soft text-ocar rounded-full px-2 py-0.5 whitespace-nowrap">
-                אפשרויות: {options.length}
-              </span>
-            )}
-          </div>
-          {item.description && <div className="text-xs text-slate-500 line-clamp-2 break-words">{item.description}</div>}
-        </div>
-        {!hasOptions && item.photos?.length > 0 && (
-          <img src={item.photos[0]} alt="" className="h-10 w-10 rounded object-cover" />
-        )}
-        <div className="text-sm text-slate-600 whitespace-nowrap">
-          {hasOptions ? (
-            formatRange(range.low, range.high)
-          ) : (
-            formatPrice(item.price) || '—'
-          )}
-        </div>
-        <button onClick={() => setOpen((o) => !o)} className="text-slate-400 hover:text-ocar text-sm px-2">
-          {open ? 'סגור' : 'ערוך'}
-        </button>
-      </div>
 
-      {/* Expanded inline editor */}
-      {open && (
-        <div className="border-t border-slate-100 p-4 space-y-3">
+        <div className="p-4 space-y-3">
           <input className={field} value={item.title} onChange={(e) => set({ title: e.target.value })} placeholder="שם הפעילות" />
           <textarea className={field} rows={4} value={item.description || ''}
             onChange={(e) => set({ description: e.target.value })} placeholder="תיאור" />
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <label className="text-xs text-slate-500">
-              שעת התחלה
-              <input className={field} value={item.approx_start || ''} placeholder="למשל 09:00"
-                onChange={(e) => set({ approx_start: e.target.value })} />
-            </label>
-            <label className="text-xs text-slate-500">
-              שעת סיום
-              <input className={field} value={item.approx_end || ''} placeholder="למשל 14:00"
-                onChange={(e) => set({ approx_end: e.target.value })} />
-            </label>
-            <label className="text-xs text-slate-500">
               משך (שעות)
               <input type="number" step="0.5" min="0" className={field} value={item.approx_duration_hours ?? ''}
-                onChange={(e) => set({ approx_duration_hours: e.target.value ? Number(e.target.value) : null })} />
+                onChange={(e) => {
+                  let v = e.target.value ? Number(e.target.value) : null;
+                  // Don't let a duration push the block past midnight.
+                  const s = startToMinutes(item.approx_start);
+                  if (v && s !== null) v = Math.min(v, (DAY_END_MIN - s) / 60);
+                  set({ approx_duration_hours: v });
+                }} />
             </label>
             <label className="text-xs text-slate-500">
               קטגוריה
               <CategorySelect value={item.category} onChange={(category) => set({ category })} />
             </label>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <label className="text-xs text-slate-500 sm:col-span-1">
-              הערת זמן חופשית (אם לא בטוח בשעה)
-              <input className={field} value={item.time_note || ''} placeholder="למשל: בוקר, בערך 8–10"
+            <label className="text-xs text-slate-500 col-span-2">
+              הערת זמן חופשית (לא חובה)
+              <input className={field} value={item.time_note || ''} placeholder="למשל: בוקר, גמיש"
                 onChange={(e) => set({ time_note: e.target.value })} />
             </label>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <label className="text-xs text-slate-500">
               איש קשר
               <input className={field} value={item.contact_name || ''} placeholder="שם"
@@ -187,9 +148,6 @@ export default function TimelineItem({ item, onChange, onRemove }) {
               <input className={field} value={item.contact_phone || ''} placeholder="050-…"
                 onChange={(e) => set({ contact_phone: e.target.value })} />
             </label>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
             <label className="text-xs text-slate-500">
               מחיר (₪)
               <input type="number" className={field} value={item.price ?? ''}
@@ -277,13 +235,13 @@ export default function TimelineItem({ item, onChange, onRemove }) {
           </div>
 
           <div className="flex justify-between pt-1">
-            <button onClick={() => onRemove(item.id)} className="text-red-500 text-sm hover:underline">
+            <button onClick={() => { onRemove(item.id); onClose(); }} className="text-red-500 text-sm hover:underline">
               מחק פעילות
             </button>
-            <button onClick={() => setOpen(false)} className="text-ocar text-sm font-medium">סיום</button>
+            <button onClick={onClose} className="text-ocar text-sm font-medium">סיום</button>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
