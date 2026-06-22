@@ -32,8 +32,10 @@ export function formatDuration(hours) {
 // What to show on the timeline for an item's timing.
 export function timingLabel(item) {
   if (item.approx_start && item.approx_end) return `${item.approx_start}–${item.approx_end}`;
-  if (item.approx_start && item.approx_duration_hours)
-    return `${item.approx_start}–${addHours(item.approx_start, item.approx_duration_hours)}`;
+  if (item.approx_start && item.approx_duration_hours) {
+    const end = addHours(item.approx_start, item.approx_duration_hours);
+    return end ? `${item.approx_start}–${end}` : item.approx_start;
+  }
   if (item.approx_start) return item.approx_start;
   if (item.time_note) return item.time_note;
   if (item.approx_duration_hours) return `~${formatDuration(item.approx_duration_hours)}`;
