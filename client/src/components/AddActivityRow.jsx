@@ -65,7 +65,7 @@ export default function AddActivityRow({ onAdd }) {
               >
                 <span className="font-medium">{c.title}</span>
                 <span className="text-xs text-slate-400">
-                  {[formatDuration(c.default_duration_min), formatPrice(c.default_price_min, c.default_price_max)]
+                  {[formatDuration(c.default_duration_hours), formatPrice(c.default_price_min, c.default_price_max)]
                     .filter(Boolean)
                     .join(' · ')}
                 </span>

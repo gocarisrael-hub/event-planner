@@ -1,8 +1,8 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useState } from 'react';
-import { useCatalogStore } from '../store/useCatalogStore.js';
 import { formatDuration, formatPrice, timingLabel } from '../utils/format.js';
+import CategorySelect from './CategorySelect.jsx';
 import PhotoUploader from './PhotoUploader.jsx';
 
 const field = 'w-full border border-slate-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-ocar';
@@ -10,7 +10,6 @@ const field = 'w-full border border-slate-300 rounded-lg px-2 py-1 text-sm focus
 // A schedule block. Collapsed = a row in the day; expanded = inline editor.
 export default function TimelineItem({ item, onChange, onRemove }) {
   const [open, setOpen] = useState(false);
-  const vendors = useCatalogStore((s) => s.vendors);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
   });
@@ -27,8 +26,8 @@ export default function TimelineItem({ item, onChange, onRemove }) {
         </button>
         <div className="text-center min-w-[72px]">
           <div className="text-sm font-bold text-ocar">{timingLabel(item) || '—'}</div>
-          {item.approx_duration_min ? (
-            <div className="text-[11px] text-slate-400">{formatDuration(item.approx_duration_min)}</div>
+          {item.approx_duration_hours ? (
+            <div className="text-[11px] text-slate-400">{formatDuration(item.approx_duration_hours)}</div>
           ) : null}
         </div>
         <div className="flex-1 min-w-0">
@@ -64,25 +63,33 @@ export default function TimelineItem({ item, onChange, onRemove }) {
                 onChange={(e) => set({ approx_start: e.target.value })} />
             </label>
             <label className="text-xs text-slate-500">
-              משך (דקות)
-              <input type="number" className={field} value={item.approx_duration_min ?? ''}
-                onChange={(e) => set({ approx_duration_min: e.target.value ? Number(e.target.value) : null })} />
+              משך (שעות)
+              <input type="number" step="0.5" min="0" className={field} value={item.approx_duration_hours ?? ''}
+                onChange={(e) => set({ approx_duration_hours: e.target.value ? Number(e.target.value) : null })} />
             </label>
             <label className="text-xs text-slate-500">
-              ספק
-              <select className={field} value={item.vendor_id || ''}
-                onChange={(e) => set({ vendor_id: e.target.value || null })}>
-                <option value="">—</option>
-                {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-              </select>
+              קטגוריה
+              <CategorySelect value={item.category} onChange={(category) => set({ category })} />
             </label>
           </div>
 
-          <label className="text-xs text-slate-500 block">
-            הערת זמן חופשית (אם לא בטוח בשעה)
-            <input className={field} value={item.time_note || ''} placeholder="למשל: בוקר, בערך 8–10"
-              onChange={(e) => set({ time_note: e.target.value })} />
-          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label className="text-xs text-slate-500 sm:col-span-1">
+              הערת זמן חופשית (אם לא בטוח בשעה)
+              <input className={field} value={item.time_note || ''} placeholder="למשל: בוקר, בערך 8–10"
+                onChange={(e) => set({ time_note: e.target.value })} />
+            </label>
+            <label className="text-xs text-slate-500">
+              איש קשר
+              <input className={field} value={item.contact_name || ''} placeholder="שם"
+                onChange={(e) => set({ contact_name: e.target.value })} />
+            </label>
+            <label className="text-xs text-slate-500">
+              טלפון
+              <input className={field} value={item.contact_phone || ''} placeholder="050-…"
+                onChange={(e) => set({ contact_phone: e.target.value })} />
+            </label>
+          </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
             <label className="text-xs text-slate-500">

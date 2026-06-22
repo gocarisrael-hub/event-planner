@@ -25,15 +25,14 @@ export const api = {
   reorderItems: (eventId, orderedIds) =>
     req('PUT', `/api/events/${eventId}/items/reorder`, { ordered_ids: orderedIds }),
 
-  // catalog + vendors
+  // catalog + categories
   listCatalog: () => req('GET', '/api/catalog'),
   createCatalog: (data) => req('POST', '/api/catalog', data),
   updateCatalog: (id, patch) => req('PATCH', `/api/catalog/${id}`, patch),
   deleteCatalog: (id) => req('DELETE', `/api/catalog/${id}`),
-  listVendors: () => req('GET', '/api/vendors'),
-  createVendor: (data) => req('POST', '/api/vendors', data),
-  updateVendor: (id, patch) => req('PATCH', `/api/vendors/${id}`, patch),
-  deleteVendor: (id) => req('DELETE', `/api/vendors/${id}`),
+  listCategories: () => req('GET', '/api/categories'),
+  createCategory: (name) => req('POST', '/api/categories', { name }),
+  deleteCategory: (id) => req('DELETE', `/api/categories/${id}`),
 
   // uploads
   uploadPhoto: async (file) => {

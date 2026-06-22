@@ -57,8 +57,8 @@ export default function ProposalPreview() {
             <div key={it.id} className="flex gap-4 print-break border-b border-slate-100 pb-3">
               <div className="min-w-[90px] text-center">
                 <div className="font-bold" style={{ color: brand.colors.primary }}>{timingLabel(it) || '—'}</div>
-                {it.approx_duration_min ? (
-                  <div className="text-xs text-slate-400">{formatDuration(it.approx_duration_min)}</div>
+                {it.approx_duration_hours ? (
+                  <div className="text-xs text-slate-400">{formatDuration(it.approx_duration_hours)}</div>
                 ) : null}
               </div>
               {it.photos?.[0] && (

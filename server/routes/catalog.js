@@ -1,6 +1,6 @@
-// Reusable catalog of activities + vendors.
+// Reusable catalog of activities + the defined category list.
 import { Router } from 'express';
-import { catalog, vendors } from '../db.js';
+import { catalog, categories } from '../db.js';
 
 const router = Router();
 
@@ -13,10 +13,11 @@ router.post('/', (req, res) => {
     title: b.title || 'פעילות',
     description: b.description || '',
     category: b.category || '',
-    default_duration_min: b.default_duration_min ?? null,
+    default_duration_hours: b.default_duration_hours ?? null,
     default_price_min: b.default_price_min ?? null,
     default_price_max: b.default_price_max ?? null,
-    vendor_id: b.vendor_id || null,
+    contact_name: b.contact_name || '',
+    contact_phone: b.contact_phone || '',
     photos: b.photos || [],
     tags: b.tags || [],
   });
@@ -33,18 +34,14 @@ router.delete('/:id', (req, res) => res.json({ ok: catalog.remove(req.params.id)
 
 export default router;
 
-// --- Vendors (mounted separately in index.js) -----------------------------
-export const vendorRouter = Router();
-vendorRouter.get('/', (_req, res) => res.json(vendors.all()));
-vendorRouter.post('/', (req, res) => {
-  const b = req.body || {};
-  res.status(201).json(
-    vendors.insert({ name: b.name || '', contact: b.contact || '', notes: b.notes || '' })
-  );
+// --- Categories (defined list; mounted separately in index.js) ------------
+export const categoryRouter = Router();
+categoryRouter.get('/', (_req, res) => res.json(categories.all()));
+categoryRouter.post('/', (req, res) => {
+  const name = (req.body?.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'name required' });
+  const existing = categories.all().find((c) => c.name === name);
+  if (existing) return res.status(200).json(existing);
+  res.status(201).json(categories.insert({ name }));
 });
-vendorRouter.patch('/:id', (req, res) => {
-  const row = vendors.update(req.params.id, req.body || {});
-  if (!row) return res.status(404).json({ error: 'not found' });
-  res.json(row);
-});
-vendorRouter.delete('/:id', (req, res) => res.json({ ok: vendors.remove(req.params.id) }));
+categoryRouter.delete('/:id', (req, res) => res.json({ ok: categories.remove(req.params.id) }));

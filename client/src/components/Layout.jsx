@@ -33,7 +33,7 @@ export default function Layout() {
           <nav className="flex items-center gap-1 mr-auto">
             <Tab to="/">הימים שלי</Tab>
             <Tab to="/catalog">קטלוג</Tab>
-            <Tab to="/vendors">ספקים</Tab>
+            <Tab to="/categories">קטגוריות</Tab>
           </nav>
         </div>
       </header>

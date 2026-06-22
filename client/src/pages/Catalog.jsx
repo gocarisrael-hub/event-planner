@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import CategorySelect from '../components/CategorySelect.jsx';
 import PhotoUploader from '../components/PhotoUploader.jsx';
 import { useCatalogStore } from '../store/useCatalogStore.js';
 import { formatDuration, formatPrice } from '../utils/format.js';
@@ -6,23 +7,24 @@ import { formatDuration, formatPrice } from '../utils/format.js';
 const field = 'w-full border border-slate-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-ocar';
 const blank = {
   title: '', description: '', category: '',
-  default_duration_min: '', default_price_min: '', default_price_max: '', vendor_id: '', photos: [],
+  default_duration_hours: '', default_price_min: '', default_price_max: '',
+  contact_name: '', contact_phone: '', photos: [],
 };
 
 export default function Catalog() {
-  const { catalog, vendors, loaded, load, addCatalog, updateCatalog, removeCatalog, vendorName } =
+  const { catalog, categories, loaded, load, addCatalog, updateCatalog, removeCatalog } =
     useCatalogStore();
   const [draft, setDraft] = useState(blank);
   const [editing, setEditing] = useState(null); // id
+  const [filter, setFilter] = useState(''); // category filter
 
   useEffect(() => { if (!loaded) load(); }, [loaded]);
 
   const numify = (d) => ({
     ...d,
-    default_duration_min: d.default_duration_min ? Number(d.default_duration_min) : null,
+    default_duration_hours: d.default_duration_hours ? Number(d.default_duration_hours) : null,
     default_price_min: d.default_price_min ? Number(d.default_price_min) : null,
     default_price_max: d.default_price_max ? Number(d.default_price_max) : null,
-    vendor_id: d.vendor_id || null,
   });
 
   const save = async () => {
@@ -31,11 +33,16 @@ export default function Catalog() {
     setDraft(blank);
   };
 
+  const shown = useMemo(
+    () => (filter ? catalog.filter((c) => c.category === filter) : catalog),
+    [catalog, filter]
+  );
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-1">קטלוג פעילויות</h1>
       <p className="text-slate-500 mb-6 text-sm">
-        כל פעילות שתוסיף ביום נשמרת כאן אוטומטית. אפשר גם להוסיף ידנית עם מחיר, משך ותמונות.
+        כל פעילות שתוסיף ביום נשמרת כאן אוטומטית. אפשר גם להוסיף ידנית עם איש קשר, טלפון, מחיר, משך ותמונות.
       </p>
 
       {/* Add new */}
@@ -43,23 +50,23 @@ export default function Catalog() {
         <div className="grid sm:grid-cols-2 gap-3">
           <input className={field} placeholder="שם פעילות" value={draft.title}
             onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
-          <input className={field} placeholder="קטגוריה (אוכל / אטרקציה…)" value={draft.category}
-            onChange={(e) => setDraft({ ...draft, category: e.target.value })} />
+          <CategorySelect value={draft.category} onChange={(category) => setDraft({ ...draft, category })} />
         </div>
         <input className={field} placeholder="תיאור" value={draft.description}
           onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <input type="number" className={field} placeholder="משך (דק')" value={draft.default_duration_min}
-            onChange={(e) => setDraft({ ...draft, default_duration_min: e.target.value })} />
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <input type="number" step="0.5" min="0" className={field} placeholder="משך (שעות)" value={draft.default_duration_hours}
+            onChange={(e) => setDraft({ ...draft, default_duration_hours: e.target.value })} />
           <input type="number" className={field} placeholder="מחיר מ־" value={draft.default_price_min}
             onChange={(e) => setDraft({ ...draft, default_price_min: e.target.value })} />
           <input type="number" className={field} placeholder="מחיר עד" value={draft.default_price_max}
             onChange={(e) => setDraft({ ...draft, default_price_max: e.target.value })} />
-          <select className={field} value={draft.vendor_id}
-            onChange={(e) => setDraft({ ...draft, vendor_id: e.target.value })}>
-            <option value="">ספק…</option>
-            {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <input className={field} placeholder="איש קשר" value={draft.contact_name}
+            onChange={(e) => setDraft({ ...draft, contact_name: e.target.value })} />
+          <input className={field} placeholder="טלפון" value={draft.contact_phone}
+            onChange={(e) => setDraft({ ...draft, contact_phone: e.target.value })} />
         </div>
         <PhotoUploader photos={draft.photos} onChange={(photos) => setDraft({ ...draft, photos })} small />
         <button onClick={save} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90">
@@ -67,22 +74,44 @@ export default function Catalog() {
         </button>
       </div>
 
+      {/* Filter by category */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <span className="text-sm text-slate-500">סינון:</span>
+        <button onClick={() => setFilter('')}
+          className={`px-3 py-1 rounded-full text-sm ${filter === '' ? 'bg-ocar text-white' : 'bg-white border border-slate-200'}`}>
+          הכל
+        </button>
+        {categories.map((c) => (
+          <button key={c.id} onClick={() => setFilter(c.name)}
+            className={`px-3 py-1 rounded-full text-sm ${filter === c.name ? 'bg-ocar text-white' : 'bg-white border border-slate-200'}`}>
+            {c.name}
+          </button>
+        ))}
+      </div>
+
       {/* List */}
       <div className="grid gap-3 sm:grid-cols-2">
-        {catalog.map((c) => (
+        {shown.map((c) => (
           <div key={c.id} className="bg-white rounded-xl border border-slate-200 p-4">
             {editing === c.id ? (
               <div className="space-y-2">
                 <input className={field} value={c.title} onChange={(e) => updateCatalog(c.id, { title: e.target.value })} />
                 <input className={field} value={c.description || ''} placeholder="תיאור"
                   onChange={(e) => updateCatalog(c.id, { description: e.target.value })} />
+                <CategorySelect value={c.category} onChange={(category) => updateCatalog(c.id, { category })} />
                 <div className="grid grid-cols-3 gap-2">
-                  <input type="number" className={field} value={c.default_duration_min ?? ''} placeholder="דק'"
-                    onChange={(e) => updateCatalog(c.id, { default_duration_min: e.target.value ? Number(e.target.value) : null })} />
+                  <input type="number" step="0.5" min="0" className={field} value={c.default_duration_hours ?? ''} placeholder="שעות"
+                    onChange={(e) => updateCatalog(c.id, { default_duration_hours: e.target.value ? Number(e.target.value) : null })} />
                   <input type="number" className={field} value={c.default_price_min ?? ''} placeholder="מ־"
                     onChange={(e) => updateCatalog(c.id, { default_price_min: e.target.value ? Number(e.target.value) : null })} />
                   <input type="number" className={field} value={c.default_price_max ?? ''} placeholder="עד"
                     onChange={(e) => updateCatalog(c.id, { default_price_max: e.target.value ? Number(e.target.value) : null })} />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input className={field} value={c.contact_name || ''} placeholder="איש קשר"
+                    onChange={(e) => updateCatalog(c.id, { contact_name: e.target.value })} />
+                  <input className={field} value={c.contact_phone || ''} placeholder="טלפון"
+                    onChange={(e) => updateCatalog(c.id, { contact_phone: e.target.value })} />
                 </div>
                 <PhotoUploader photos={c.photos || []} onChange={(photos) => updateCatalog(c.id, { photos })} small />
                 <button onClick={() => setEditing(null)} className="text-ocar text-sm font-medium">סיום</button>
@@ -101,9 +130,10 @@ export default function Catalog() {
                 </div>
                 {c.description && <p className="text-sm text-slate-500 mt-1">{c.description}</p>}
                 <div className="flex gap-2 mt-2 text-xs text-slate-400 flex-wrap">
-                  {formatDuration(c.default_duration_min) && <span>{formatDuration(c.default_duration_min)}</span>}
+                  {formatDuration(c.default_duration_hours) && <span>{formatDuration(c.default_duration_hours)}</span>}
                   {formatPrice(c.default_price_min, c.default_price_max) && <span>{formatPrice(c.default_price_min, c.default_price_max)}</span>}
-                  {c.vendor_id && <span>· {vendorName(c.vendor_id)}</span>}
+                  {c.contact_name && <span>· {c.contact_name}</span>}
+                  {c.contact_phone && <span>· {c.contact_phone}</span>}
                 </div>
                 {c.photos?.length > 0 && (
                   <div className="flex gap-1 mt-2">
