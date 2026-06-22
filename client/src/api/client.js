@@ -25,6 +25,13 @@ export const api = {
   reorderItems: (eventId, orderedIds) =>
     req('PUT', `/api/events/${eventId}/items/reorder`, { ordered_ids: orderedIds }),
 
+  // options (alternatives nested in an item)
+  addOption: (itemId, data) => req('POST', `/api/events/items/${itemId}/options`, data),
+  updateOption: (itemId, optionId, patch) =>
+    req('PATCH', `/api/events/items/${itemId}/options/${optionId}`, patch),
+  deleteOption: (itemId, optionId) =>
+    req('DELETE', `/api/events/items/${itemId}/options/${optionId}`),
+
   // catalog + categories
   listCatalog: () => req('GET', '/api/catalog'),
   createCatalog: (data) => req('POST', '/api/catalog', data),

@@ -37,6 +37,38 @@ export const useEventStore = create((set, get) => ({
     await api.deleteItem(id);
   },
 
+  // Options (alternatives) nested inside an item.
+  addOption: async (itemId, data) => {
+    const option = await api.addOption(itemId, data);
+    set({
+      items: get().items.map((i) =>
+        i.id === itemId ? { ...i, options: [...(i.options || []), option] } : i,
+      ),
+    });
+    return option;
+  },
+
+  updateOption: async (itemId, optionId, patch) => {
+    // optimistic
+    set({
+      items: get().items.map((i) =>
+        i.id === itemId
+          ? { ...i, options: (i.options || []).map((o) => (o.id === optionId ? { ...o, ...patch } : o)) }
+          : i,
+      ),
+    });
+    await api.updateOption(itemId, optionId, patch);
+  },
+
+  removeOption: async (itemId, optionId) => {
+    set({
+      items: get().items.map((i) =>
+        i.id === itemId ? { ...i, options: (i.options || []).filter((o) => o.id !== optionId) } : i,
+      ),
+    });
+    await api.deleteOption(itemId, optionId);
+  },
+
   setItemsOrder: async (orderedItems) => {
     set({ items: orderedItems });
     await api.reorderItems(get().event.id, orderedItems.map((i) => i.id));

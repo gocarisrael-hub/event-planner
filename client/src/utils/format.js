@@ -5,6 +5,12 @@ export function formatPrice(price) {
   return `₪${price}`;
 }
 
+// Format a price range. Single value when low===high; otherwise a span.
+export function formatRange(low, high) {
+  if (low === high) return formatPrice(low);
+  return `₪${low}–₪${high}`;
+}
+
 // Add `hours` (may be fractional) to an "H:MM"/"HH:MM"/"HH" time string.
 // Returns "HH:MM" zero-padded, wrapping past 24h. '' for empty/invalid input.
 export function addHours(timeStr, hours) {
@@ -42,14 +48,25 @@ export function timingLabel(item) {
   return '';
 }
 
-// Sum the schedule into a single per-head total (only items with show_price).
+// Sum the schedule into a per-head price range (only items with show_price).
+// A choice block (with options) contributes cheapest–priciest; a plain item
+// contributes its single price to both ends (low===high).
 export function total(items) {
-  let sum = 0;
+  let low = 0;
+  let high = 0;
   for (const it of items) {
     if (it.show_price === false) continue;
-    sum += Number(it.price ?? 0) || 0;
+    if (it.options?.length) {
+      const prices = it.options.map((o) => Number(o.price) || 0);
+      low += Math.min(...prices);
+      high += Math.max(...prices);
+    } else {
+      const p = Number(it.price) || 0;
+      low += p;
+      high += p;
+    }
   }
-  return sum;
+  return { low, high };
 }
 
 export const SEASONS = ['אביב', 'קיץ', 'סתיו', 'חורף'];

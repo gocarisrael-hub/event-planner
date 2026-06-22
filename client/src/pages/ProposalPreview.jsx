@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { brand } from '../brand/brand.js';
-import { formatDuration, formatPrice, timingLabel, total, whenLabel } from '../utils/format.js';
+import { formatDuration, formatPrice, formatRange, timingLabel, total, whenLabel } from '../utils/format.js';
 
 export default function ProposalPreview() {
   const { id } = useParams();
@@ -13,7 +13,7 @@ export default function ProposalPreview() {
   if (!event) return <p className="p-8 text-slate-400">טוען…</p>;
 
   const items = event.items || [];
-  const headTotal = total(items);
+  const { low, high } = total(items);
 
   return (
     <div className="min-h-screen bg-slate-100" dir="rtl">
@@ -54,39 +54,70 @@ export default function ProposalPreview() {
         <h2 className="text-lg font-bold mb-3" style={{ color: brand.colors.primary }}>הלו״ז ליום</h2>
         <div className="space-y-3">
           {items.map((it) => (
-            <div key={it.id} className="flex gap-4 print-break border-b border-slate-100 pb-3">
-              <div className="min-w-[90px] text-center">
-                <div className="font-bold" style={{ color: brand.colors.primary }}><bdi>{timingLabel(it) || '—'}</bdi></div>
-                {it.approx_duration_hours ? (
-                  <div className="text-xs text-slate-400">{formatDuration(it.approx_duration_hours)}</div>
-                ) : null}
+            <div key={it.id} className="print-break border-b border-slate-100 pb-3">
+              <div className="flex gap-4">
+                <div className="min-w-[90px] text-center">
+                  <div className="font-bold" style={{ color: brand.colors.primary }}><bdi>{timingLabel(it) || '—'}</bdi></div>
+                  {it.approx_duration_hours ? (
+                    <div className="text-xs text-slate-400">{formatDuration(it.approx_duration_hours)}</div>
+                  ) : null}
+                </div>
+                {!it.options?.length && it.photos?.[0] && (
+                  <img src={it.photos[0]} alt="" className="h-20 w-24 rounded-lg object-cover" />
+                )}
+                <div className="flex-1">
+                  <div className="font-semibold">{it.title}</div>
+                  {it.description && <div className="text-sm text-slate-500 break-words">{it.description}</div>}
+                </div>
+                {showPrices && it.show_price !== false && !it.options?.length && formatPrice(it.price) && (
+                  <div className="text-sm font-medium whitespace-nowrap">{formatPrice(it.price)}</div>
+                )}
               </div>
-              {it.photos?.[0] && (
-                <img src={it.photos[0]} alt="" className="h-20 w-24 rounded-lg object-cover" />
-              )}
-              <div className="flex-1">
-                <div className="font-semibold">{it.title}</div>
-                {it.description && <div className="text-sm text-slate-500 break-words">{it.description}</div>}
-              </div>
-              {showPrices && it.show_price !== false && formatPrice(it.price) && (
-                <div className="text-sm font-medium whitespace-nowrap">{formatPrice(it.price)}</div>
+
+              {it.options?.length > 0 && (
+                <div className="mt-3 pr-[106px]">
+                  <div className="text-xs font-medium text-slate-400 mb-2">בחירה בין:</div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {it.options.map((o) => (
+                      <div key={o.id} className="border border-slate-200 rounded-lg p-3 flex gap-3">
+                        {o.photos?.[0] && (
+                          <img src={o.photos[0]} alt="" className="h-16 w-16 rounded object-cover flex-shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="font-semibold">{o.title}</div>
+                            {showPrices && it.show_price !== false && formatPrice(o.price) && (
+                              <div className="text-sm font-medium whitespace-nowrap">{formatPrice(o.price)}</div>
+                            )}
+                          </div>
+                          {o.description && <div className="text-sm text-slate-500 break-words">{o.description}</div>}
+                          {(o.contact_name || o.contact_phone) && (
+                            <div className="text-xs text-slate-400 mt-1">
+                              {[o.contact_name, o.contact_phone].filter(Boolean).join(' · ')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           ))}
         </div>
 
-        {showPrices && headTotal > 0 && (
+        {showPrices && high > 0 && (
           <div className="mt-6 pt-4 border-t-2" style={{ borderColor: brand.colors.primary }}>
             <div className="flex justify-between items-center">
               <span className="font-bold text-lg">מחיר לאדם</span>
               <span className="font-extrabold text-lg" style={{ color: brand.colors.primary }}>
-                {formatPrice(headTotal)}
+                {formatRange(low, high)}
               </span>
             </div>
             {event.group_size > 0 && (
               <div className="flex justify-between items-center text-slate-500 mt-1">
                 <span>סה״כ לקבוצה (×{event.group_size})</span>
-                <span className="font-medium">{formatPrice(headTotal * event.group_size)}</span>
+                <span className="font-medium">{formatRange(low * event.group_size, high * event.group_size)}</span>
               </div>
             )}
           </div>

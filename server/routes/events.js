@@ -1,4 +1,5 @@
 // Events (days) + their schedule items.
+import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { catalog, events, items } from '../db.js';
 
@@ -119,6 +120,7 @@ router.post('/:id/items', (req, res) => {
     approx_start: b.approx_start || null,
     time_note: b.time_note || '',
     notes: b.notes || '',
+    options: [],
     ...base,
   });
   res.status(201).json(item);
@@ -132,6 +134,80 @@ router.patch('/items/:itemId', (req, res) => {
 
 router.delete('/items/:itemId', (req, res) => {
   res.json({ ok: items.remove(req.params.itemId) });
+});
+
+// --- Options (alternatives nested inside an item) ------------------------
+// Add an option to a choice block. If `from_catalog_id` given, copy catalog
+// defaults. Otherwise a fresh option that is auto-saved to the catalog.
+router.post('/items/:itemId/options', (req, res) => {
+  const item = items.find(req.params.itemId);
+  if (!item) return res.status(404).json({ error: 'not found' });
+  const b = req.body || {};
+
+  let option = {
+    id: randomUUID(),
+    title: b.title || 'אפשרות',
+    description: b.description || '',
+    price: b.price ?? null,
+    photos: b.photos || [],
+    contact_name: b.contact_name || '',
+    contact_phone: b.contact_phone || '',
+    catalog_activity_id: null,
+  };
+
+  if (b.from_catalog_id) {
+    const c = catalog.find(b.from_catalog_id);
+    if (c) {
+      option = {
+        ...option,
+        title: c.title,
+        description: c.description,
+        price: c.default_price,
+        photos: c.photos || [],
+        contact_name: c.contact_name || '',
+        contact_phone: c.contact_phone || '',
+        catalog_activity_id: c.id,
+      };
+    }
+  } else if (b.save_to_catalog !== false) {
+    // Brand-new option created inline → remember it in the catalog.
+    const created = catalog.insert({
+      title: option.title,
+      description: option.description,
+      category: '',
+      default_duration_hours: null,
+      default_price: option.price,
+      contact_name: option.contact_name,
+      contact_phone: option.contact_phone,
+      photos: option.photos,
+      tags: [],
+    });
+    option.catalog_activity_id = created.id;
+  }
+
+  const options = [...(item.options || []), option];
+  items.update(item.id, { options });
+  res.status(201).json(option);
+});
+
+router.patch('/items/:itemId/options/:optionId', (req, res) => {
+  const item = items.find(req.params.itemId);
+  if (!item) return res.status(404).json({ error: 'not found' });
+  const options = (item.options || []).map((o) =>
+    o.id === req.params.optionId ? { ...o, ...(req.body || {}) } : o,
+  );
+  items.update(item.id, { options });
+  const option = options.find((o) => o.id === req.params.optionId);
+  if (!option) return res.status(404).json({ error: 'not found' });
+  res.json(option);
+});
+
+router.delete('/items/:itemId/options/:optionId', (req, res) => {
+  const item = items.find(req.params.itemId);
+  if (!item) return res.status(404).json({ error: 'not found' });
+  const options = (item.options || []).filter((o) => o.id !== req.params.optionId);
+  items.update(item.id, { options });
+  res.json({ ok: true });
 });
 
 // Reorder: body { ordered_ids: [...] }
