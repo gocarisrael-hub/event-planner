@@ -41,6 +41,14 @@ export const api = {
   createCategory: (name) => req('POST', '/api/categories', { name }),
   deleteCategory: (id) => req('DELETE', `/api/categories/${id}`),
 
+  // gmail integration
+  gmailStatus: () => req('GET', '/api/gmail/status'),
+  gmailAuthUrl: () => req('GET', '/api/gmail/auth-url'),
+  gmailMessages: (max = 25) => req('GET', `/api/gmail/messages?max=${max}`),
+  gmailMessage: (id) => req('GET', `/api/gmail/messages/${id}`),
+  gmailCreateDay: (messageId) => req('POST', '/api/gmail/create-day', { message_id: messageId }),
+  gmailDraftReply: (eventId) => req('POST', '/api/gmail/draft-reply', { event_id: eventId }),
+
   // uploads
   uploadPhoto: async (file) => {
     const fd = new FormData();

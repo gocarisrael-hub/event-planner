@@ -1,7 +1,8 @@
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { api } from '../api/client.js';
 import AddActivityRow from '../components/AddActivityRow.jsx';
 import BudgetMeter from '../components/BudgetMeter.jsx';
 import TimelineItem from '../components/TimelineItem.jsx';
@@ -14,6 +15,10 @@ export default function DayBuilder() {
   const { event, items, loading, load, addItem, updateItem, removeItem, setItemsOrder } = useEventStore();
   const loadCatalog = useCatalogStore((s) => s.load);
   const refreshCatalog = useCatalogStore((s) => s.refresh);
+
+  const [draftPending, setDraftPending] = useState(false);
+  const [draftLink, setDraftLink] = useState('');
+  const [draftError, setDraftError] = useState('');
 
   useEffect(() => { load(id); }, [id]);
   useEffect(() => { loadCatalog(); }, []);
@@ -33,6 +38,24 @@ export default function DayBuilder() {
     const oldI = items.findIndex((i) => i.id === active.id);
     const newI = items.findIndex((i) => i.id === over.id);
     setItemsOrder(arrayMove(items, oldI, newI));
+  };
+
+  const draftReply = async () => {
+    setDraftPending(true);
+    setDraftError('');
+    setDraftLink('');
+    try {
+      const res = await api.gmailDraftReply(event.id);
+      if (res && res.link) {
+        setDraftLink(res.link);
+      } else {
+        setDraftError(res && res.error ? res.error : 'צריך לחבר את Gmail קודם');
+      }
+    } catch {
+      setDraftError('צריך לחבר את Gmail קודם');
+    } finally {
+      setDraftPending(false);
+    }
   };
 
   return (
@@ -81,6 +104,66 @@ export default function DayBuilder() {
           <div className="bg-white rounded-xl border border-slate-200 p-4 text-sm">
             <div className="font-medium mb-1">מה הם רצו</div>
             <p className="text-slate-500 whitespace-pre-wrap">{event.requests}</p>
+          </div>
+        )}
+
+        {event.email && (
+          <div className="bg-white rounded-xl border border-slate-200 p-4 text-sm space-y-3">
+            <div>
+              <div className="font-medium mb-2">המייל המקושר</div>
+              <dl className="space-y-1 text-slate-500">
+                {event.email.from && (
+                  <div>
+                    <span className="text-slate-400">מאת: </span>
+                    {event.email.from}
+                  </div>
+                )}
+                {event.email.subject && (
+                  <div>
+                    <span className="text-slate-400">נושא: </span>
+                    {event.email.subject}
+                  </div>
+                )}
+                {event.email.date && (
+                  <div>
+                    <span className="text-slate-400">תאריך: </span>
+                    {new Date(event.email.date).toLocaleString('he-IL')}
+                  </div>
+                )}
+                {event.email.snippet && (
+                  <p className="text-slate-500 whitespace-pre-wrap pt-1">{event.email.snippet}</p>
+                )}
+              </dl>
+              {event.email.message_id && (
+                <a
+                  href={`https://mail.google.com/mail/u/0/#all/${event.email.message_id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-block mt-2 text-ocar hover:underline"
+                >
+                  פתח ב-Gmail ↗
+                </a>
+              )}
+            </div>
+
+            <div className="border-t border-slate-100 pt-3">
+              <button
+                onClick={draftReply}
+                disabled={draftPending}
+                className="w-full bg-ocar text-white px-3 py-2 rounded-lg font-medium hover:opacity-90 disabled:opacity-60"
+              >
+                {draftPending ? 'מכין טיוטה…' : 'השב עם הצעה (ללא מחירים)'}
+              </button>
+              {draftLink && (
+                <p className="text-green-600 mt-2">
+                  הטיוטה מוכנה.{' '}
+                  <a href={draftLink} target="_blank" rel="noreferrer" className="underline">
+                    פתח טיוטה ב-Gmail ↗
+                  </a>
+                </p>
+              )}
+              {draftError && <p className="text-red-600 mt-2">{draftError}</p>}
+            </div>
           </div>
         )}
       </aside>
