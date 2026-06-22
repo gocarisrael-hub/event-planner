@@ -60,7 +60,6 @@ function total(items) {
   let low = 0;
   let high = 0;
   for (const it of items) {
-    if (it.show_price === false) continue;
     if (it.options?.length) {
       const ps = it.options.map((o) => Number(o.price) || 0);
       low += Math.min(...ps);
@@ -120,14 +119,14 @@ export function proposalHtml(event, { prices } = { prices: false }) {
       ? img(it.photos[0], 'item-photo')
       : '';
 
-    const mainPrice = showPrices && it.show_price !== false && !hasOptions && formatPrice(it.price)
+    const mainPrice = showPrices && !hasOptions && formatPrice(it.price)
       ? `<div class="item-price">${esc(formatPrice(it.price))}</div>`
       : '';
 
     let optionsHtml = '';
     if (hasOptions) {
       const opts = it.options.map((o) => {
-        const oPrice = showPrices && it.show_price !== false && formatPrice(o.price)
+        const oPrice = showPrices && formatPrice(o.price)
           ? `<div class="opt-price">${esc(formatPrice(o.price))}</div>`
           : '';
         const oPhoto = o.photos?.[0] ? img(o.photos[0], 'opt-photo') : '';
