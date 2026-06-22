@@ -2,6 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { catalog, events, items } from '../db.js';
+import { generateProposalPdf } from '../pdf/generate.js';
 
 const router = Router();
 
@@ -44,6 +45,33 @@ router.get('/:id', (req, res) => {
   const event = events.find(req.params.id);
   if (!event) return res.status(404).json({ error: 'not found' });
   res.json(withItems(event));
+});
+
+// In-app proposal PDF download (no addon key). Renders a clean A4 Hebrew PDF.
+router.get('/:id/proposal.pdf', async (req, res) => {
+  const event = events.find(req.params.id);
+  if (!event) return res.status(404).json({ error: 'not found' });
+
+  const prices = req.query.prices === 'true';
+
+  let pdfBuffer;
+  try {
+    pdfBuffer = await generateProposalPdf(withItems(event), { prices });
+  } catch (err) {
+    return res
+      .status(503)
+      .json({ error: 'pdf_unavailable', message: String(err.message || err) });
+  }
+
+  // UTF-8 filename* carries the event title; the plain ASCII filename is a
+  // safe fallback for clients that don't support RFC 5987.
+  const utf8Name = encodeURIComponent(`${event.title || 'הצעה'}.pdf`);
+  res.set('Content-Type', 'application/pdf');
+  res.set(
+    'Content-Disposition',
+    `attachment; filename="proposal.pdf"; filename*=UTF-8''${utf8Name}`,
+  );
+  res.send(pdfBuffer);
 });
 
 router.patch('/:id', (req, res) => {
