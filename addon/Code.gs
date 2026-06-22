@@ -274,7 +274,8 @@ function draftReply(e) {
   }
 
   var message = currentMessage_(e);
-  var threadId = message.getThread().getId();
+  var thread = message.getThread();
+  var threadId = thread.getId();
 
   var mapping = lookupEvent_(threadId);
   if (!mapping || !mapping.event_id) {
@@ -308,7 +309,8 @@ function draftReply(e) {
     'בברכה,<br>צוות Ocar';
 
   try {
-    message.createDraftReply('', {
+    // createDraftReply is a GmailThread method (not GmailMessage).
+    thread.createDraftReply('', {
       htmlBody: htmlBody,
       attachments: [blob]
     });

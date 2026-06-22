@@ -119,5 +119,5 @@ found, it asks you to create the day first.
 
 - `gmail.addons.current.message.readonly` — read the currently open message.
 - `gmail.addons.execute` — run the add-on.
-- `gmail.compose` and `gmail.modify` — create the draft reply with the attachment.
+- `gmail.modify` — create the draft reply with the attachment.
 - `script.external_request` — call the hosted backend via `UrlFetchApp`.
