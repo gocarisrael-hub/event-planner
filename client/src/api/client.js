@@ -6,7 +6,18 @@ async function req(method, url, body) {
     opts.body = JSON.stringify(body);
   }
   const res = await fetch(url, opts);
-  if (!res.ok) throw new Error(`${method} ${url} → ${res.status}`);
+  if (!res.ok) {
+    let body = null;
+    try {
+      body = await res.json();
+    } catch {
+      // non-JSON error body
+    }
+    const err = new Error(`${method} ${url} → ${res.status}`);
+    err.status = res.status;
+    err.serverMessage = body && (body.message || body.error);
+    throw err;
+  }
   return res.status === 204 ? null : res.json();
 }
 
@@ -40,6 +51,14 @@ export const api = {
   listCategories: () => req('GET', '/api/categories'),
   createCategory: (name) => req('POST', '/api/categories', { name }),
   deleteCategory: (id) => req('DELETE', `/api/categories/${id}`),
+
+  // gmail integration
+  gmailStatus: () => req('GET', '/api/gmail/status'),
+  gmailAuthUrl: () => req('GET', '/api/gmail/auth-url'),
+  gmailMessages: (max = 25) => req('GET', `/api/gmail/messages?max=${max}`),
+  gmailMessage: (id) => req('GET', `/api/gmail/messages/${id}`),
+  gmailCreateDay: (messageId) => req('POST', '/api/gmail/create-day', { message_id: messageId }),
+  gmailDraftReply: (eventId) => req('POST', '/api/gmail/draft-reply', { event_id: eventId }),
 
   // uploads
   uploadPhoto: async (file) => {

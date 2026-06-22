@@ -34,6 +34,7 @@ export default function Layout() {
             <Tab to="/">הימים שלי</Tab>
             <Tab to="/catalog">קטלוג</Tab>
             <Tab to="/categories">קטגוריות</Tab>
+            <Tab to="/inbox">מיילים</Tab>
           </nav>
         </div>
       </header>
