@@ -8,7 +8,7 @@ const field = 'w-full border border-slate-300 rounded-lg px-2 py-1 text-sm focus
 const blank = {
   title: '', description: '', category: '',
   default_duration_hours: '', default_price: '',
-  contact_name: '', contact_phone: '', photos: [],
+  contact_name: '', contact_phone: '', location: '', photos: [],
 };
 
 export default function Catalog() {
@@ -65,6 +65,8 @@ export default function Catalog() {
           <input className={field} placeholder="טלפון" value={draft.contact_phone}
             onChange={(e) => setDraft({ ...draft, contact_phone: e.target.value })} />
         </div>
+        <input className={field} placeholder="מרחב" value={draft.location}
+          onChange={(e) => setDraft({ ...draft, location: e.target.value })} />
         <PhotoUploader photos={draft.photos} onChange={(photos) => setDraft({ ...draft, photos })} small />
         <button onClick={save} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90">
           + הוסף לקטלוג
@@ -108,6 +110,8 @@ export default function Catalog() {
                   <input className={field} value={c.contact_phone || ''} placeholder="טלפון"
                     onChange={(e) => updateCatalog(c.id, { contact_phone: e.target.value })} />
                 </div>
+                <input className={field} value={c.location || ''} placeholder="מרחב"
+                  onChange={(e) => updateCatalog(c.id, { location: e.target.value })} />
                 <PhotoUploader photos={c.photos || []} onChange={(photos) => updateCatalog(c.id, { photos })} small />
                 <button onClick={() => setEditing(null)} className="text-ocar text-sm font-medium">סיום</button>
               </div>
@@ -129,6 +133,7 @@ export default function Catalog() {
                   {formatPrice(c.default_price) && <span>{formatPrice(c.default_price)}</span>}
                   {c.contact_name && <span>· {c.contact_name}</span>}
                   {c.contact_phone && <span>· {c.contact_phone}</span>}
+                  {c.location && <span>· 📍 {c.location}</span>}
                 </div>
                 {c.photos?.length > 0 && (
                   <div className="flex gap-1 mt-2">

@@ -17,6 +17,7 @@ router.post('/', (req, res) => {
     default_price: b.default_price ?? null,
     contact_name: b.contact_name || '',
     contact_phone: b.contact_phone || '',
+    location: b.location || '',
     photos: b.photos || [],
     tags: b.tags || [],
   });
