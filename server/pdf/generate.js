@@ -16,7 +16,7 @@ async function getBrowser() {
 
   if (!browserPromise) {
     browserPromise = puppeteer
-      .launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox'] })
+      .launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] })
       .catch((err) => {
         browserPromise = null; // allow a retry on next call
         throw new Error(`PDF generation unavailable: could not launch headless Chromium (${err.message})`);
@@ -29,7 +29,9 @@ export async function generateProposalPdf(event, { prices } = { prices: false })
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
-    await page.setContent(proposalHtml(event, { prices }), { waitUntil: 'networkidle0' });
+    // 'load' (not 'networkidle0') with a bounded timeout so a slow/unreachable
+    // font or image URL can't hang draft-reply indefinitely.
+    await page.setContent(proposalHtml(event, { prices }), { waitUntil: 'load', timeout: 15000 });
     const out = await page.pdf({ format: 'A4', printBackground: true });
     // Modern Puppeteer returns a Uint8Array; normalize to a Node Buffer so
     // callers can rely on buffer.toString('base64') etc.
