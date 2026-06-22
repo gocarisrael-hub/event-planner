@@ -79,7 +79,11 @@ If deployment or consent complains:
 3. Press **"צור יום ב-Ocar"** to create the fun day with this email attached.
    - On success you get a confirmation card with **"פתח את היום"** (opens the day
      in the hosted app).
-4. Press **"השב עם הצעה (ללא מחירים)"** to fetch the proposal PDF and attach it
+4. Alternatively, under **"או קשר לפניית יום קיים:"** pick an existing day from
+   the dropdown and press **"קשר מייל ליום קיים"** to attach this email to that
+   day instead of creating a new one. The thread is then remembered for the
+   reply button, just like creating a new day.
+5. Press **"השב עם הצעה (ללא מחירים)"** to fetch the proposal PDF and attach it
    to a **draft reply** on this thread. You'll get a "טיוטה נוצרה" notification;
    open Gmail Drafts to review and send.
 

@@ -175,7 +175,57 @@ function onGmailMessage(e) {
 
   builder.addSection(actions);
 
+  // --- Optional: link this email to an EXISTING day -----------------------
+  var days = fetchDays_(conf);
+  if (days && days.length) {
+    var linkSection = CardService.newCardSection()
+      .addWidget(
+        CardService.newTextParagraph().setText('או קשר לפניית יום קיים:')
+      );
+
+    var dropdown = CardService.newSelectionInput()
+      .setType(CardService.SelectionInputType.DROPDOWN)
+      .setTitle('בחר יום קיים')
+      .setFieldName('existingDay');
+
+    for (var i = 0; i < days.length; i++) {
+      var d = days[i];
+      var label = d.title || '(ללא שם)';
+      if (d.when) label += ' — ' + d.when;
+      dropdown.addItem(label, d.id, i === 0);
+    }
+    linkSection.addWidget(dropdown);
+
+    linkSection.addWidget(
+      CardService.newTextButton()
+        .setText('קשר מייל ליום קיים')
+        .setOnClickAction(CardService.newAction().setFunctionName('linkDay'))
+    );
+
+    builder.addSection(linkSection);
+  }
+
   return builder.build();
+}
+
+/**
+ * Fetches the lightweight list of existing days from the backend.
+ * Returns an array of { id, title, client_name, when } or [] on any failure.
+ */
+function fetchDays_(conf) {
+  if (!conf || !conf.ok) return [];
+  try {
+    var resp = UrlFetchApp.fetch(conf.backendUrl + '/api/addon/days', {
+      method: 'get',
+      headers: { 'X-Addon-Key': conf.apiKey },
+      muteHttpExceptions: true
+    });
+    if (resp.getResponseCode() !== 200) return [];
+    var data = JSON.parse(resp.getContentText());
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    return [];
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -258,6 +308,101 @@ function createDay(e) {
   return CardService.newActionResponseBuilder()
     .setNotification(
       CardService.newNotification().setText('היום נוצר ב-Ocar')
+    )
+    .setNavigation(CardService.newNavigation().pushCard(card))
+    .build();
+}
+
+/* ------------------------------------------------------------------ */
+/* Action: link the email to an existing day                          */
+/* ------------------------------------------------------------------ */
+
+function linkDay(e) {
+  var conf = cfg_();
+  if (!conf.ok) {
+    return notify_('חסרה הגדרת BACKEND_URL / ADDON_API_KEY');
+  }
+
+  var message = currentMessage_(e);
+  var thread = message.getThread();
+
+  // Read the selected event id from the dropdown form input.
+  var eventId = '';
+  try {
+    eventId = e.commonEventObject.formInputs.existingDay.stringInputs.value[0];
+  } catch (err) {
+    eventId = (e.formInput && e.formInput.existingDay) || '';
+  }
+  if (!eventId) {
+    return notify_('בחר/י יום מהרשימה');
+  }
+
+  var payload = {
+    event_id: eventId,
+    message_id: message.getId(),
+    thread_id: thread.getId(),
+    from: message.getFrom() || '',
+    subject: message.getSubject() || '',
+    date: message.getDate() ? message.getDate().toISOString() : '',
+    snippet: (message.getPlainBody() || '').slice(0, 300)
+  };
+
+  var resp;
+  try {
+    resp = UrlFetchApp.fetch(conf.backendUrl + '/api/addon/link-day', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'X-Addon-Key': conf.apiKey },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+  } catch (err) {
+    return notify_('שגיאת רשת בקישור היום: ' + err);
+  }
+
+  var code = resp.getResponseCode();
+  if (code !== 201 && code !== 200) {
+    return notify_('קישור היום נכשל (קוד ' + code + '). ' + shortBody_(resp));
+  }
+
+  var data;
+  try {
+    data = JSON.parse(resp.getContentText());
+  } catch (err) {
+    return notify_('השרת החזיר תשובה לא תקינה.');
+  }
+  if (!data || !data.event_id) {
+    return notify_('השרת לא החזיר מזהה יום.');
+  }
+
+  rememberEvent_(thread.getId(), data.event_id, data.url);
+
+  var card = CardService.newCardBuilder()
+    .setHeader(CardService.newCardHeader().setTitle('המייל קושר ליום'))
+    .addSection(
+      CardService.newCardSection()
+        .addWidget(
+          CardService.newTextParagraph().setText(
+            'המייל קושר ליום הקיים. כעת אפשר להשיב ללקוח עם הצעה.'
+          )
+        )
+        .addWidget(
+          CardService.newTextButton()
+            .setText('פתח את היום')
+            .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+            .setOpenLink(CardService.newOpenLink().setUrl(data.url || conf.backendUrl))
+        )
+        .addWidget(
+          CardService.newTextButton()
+            .setText('השב עם הצעה (ללא מחירים)')
+            .setOnClickAction(CardService.newAction().setFunctionName('draftReply'))
+        )
+    )
+    .build();
+
+  return CardService.newActionResponseBuilder()
+    .setNotification(
+      CardService.newNotification().setText('המייל קושר ליום')
     )
     .setNavigation(CardService.newNavigation().pushCard(card))
     .build();

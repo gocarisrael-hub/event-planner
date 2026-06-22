@@ -61,6 +61,54 @@ router.post('/create-day', (req, res) => {
   res.status(201).json({ event_id: event.id, url: `${base}/day/${event.id}` });
 });
 
+// --- A short human label for when the day is planned ----------------------
+function whenLabel(event) {
+  if (event.target_date) {
+    try {
+      return new Date(event.target_date).toLocaleDateString('he-IL');
+    } catch {
+      return event.target_date;
+    }
+  }
+  if (event.target_month) return event.target_month;
+  if (event.target_season) return event.target_season;
+  return '';
+}
+
+// --- Lightweight list of existing days for selection in the add-on --------
+router.get('/days', (_req, res) => {
+  const list = events
+    .all()
+    .slice()
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+    .slice(0, 50)
+    .map((e) => ({
+      id: e.id,
+      title: e.title || '',
+      client_name: e.client_name || '',
+      when: whenLabel(e),
+    }));
+  res.json(list);
+});
+
+// --- Link an email to an existing day -------------------------------------
+router.post('/link-day', (req, res) => {
+  const b = req.body || {};
+  const event = events.find(b.event_id);
+  if (!event) return res.status(404).json({ error: 'not found' });
+  const email = {
+    message_id: b.message_id || null,
+    thread_id: b.thread_id || null,
+    from: b.from || '',
+    subject: b.subject || '',
+    date: b.date || '',
+    snippet: b.snippet || '',
+  };
+  events.update(event.id, { email, updated_at: now() });
+  const base = process.env.APP_BASE_URL || '';
+  res.status(201).json({ event_id: event.id, url: `${base}/day/${event.id}` });
+});
+
 // --- Proposal PDF (no prices) for an event --------------------------------
 router.get('/proposal-pdf', async (req, res) => {
   const { event_id: eventId, thread_id: threadId } = req.query;
