@@ -76,11 +76,19 @@ export default function ProposalPreview() {
         </div>
 
         {showPrices && (high > 0 || low > 0) && (
-          <div className="mt-6 pt-4 border-t-2 flex justify-between items-center" style={{ borderColor: brand.colors.primary }}>
-            <span className="font-bold text-lg">סה״כ משוער</span>
-            <span className="font-extrabold text-lg" style={{ color: brand.colors.primary }}>
-              {formatPrice(low, high)}
-            </span>
+          <div className="mt-6 pt-4 border-t-2" style={{ borderColor: brand.colors.primary }}>
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-lg">מחיר לאדם</span>
+              <span className="font-extrabold text-lg" style={{ color: brand.colors.primary }}>
+                {formatPrice(low, high)}
+              </span>
+            </div>
+            {event.group_size > 0 && (
+              <div className="flex justify-between items-center text-slate-500 mt-1">
+                <span>סה״כ לקבוצה (×{event.group_size})</span>
+                <span className="font-medium">{formatPrice(low * event.group_size, high * event.group_size)}</span>
+              </div>
+            )}
           </div>
         )}
 
