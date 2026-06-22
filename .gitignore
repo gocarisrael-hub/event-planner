@@ -12,3 +12,7 @@ server/uploads/*
 # data backups
 server/data/*.bak
 server/data/*.json.bak
+
+# Gmail integration secrets
+server/gmail/credentials.json
+server/data/gmail-token.json

@@ -33,6 +33,7 @@ router.post('/', (req, res) => {
     target_season: b.target_season || null,
     status: 'draft',
     cover_photo: null,
+    email: null,
     created_at: now(),
     updated_at: now(),
   });

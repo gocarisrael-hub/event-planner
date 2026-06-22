@@ -70,6 +70,12 @@ function migrate(d) {
       changed = true;
     }
   }
+  for (const ev of d.events || []) {
+    if (!('email' in ev)) {
+      ev.email = null;
+      changed = true;
+    }
+  }
   for (const it of d.items || []) {
     if (!Array.isArray(it.options)) {
       it.options = [];
