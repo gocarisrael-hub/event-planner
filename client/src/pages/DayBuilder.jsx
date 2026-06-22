@@ -40,36 +40,42 @@ function TimelineBlock({ item, onDragStart, onClick, dragging, top }) {
 
   return (
     <div
-      className={`absolute right-0 left-2 rounded-lg border bg-white px-3 py-1.5 overflow-hidden select-none ${
-        dragging ? 'z-30 shadow-lg border-ocar ring-2 ring-ocar/30 cursor-grabbing' : 'z-10 border-slate-200 shadow-sm hover:border-ocar cursor-grab'
+      className={`absolute right-0 left-2 flex flex-col rounded-lg border border-r-4 px-3 py-1.5 overflow-hidden select-none transition-colors ${
+        dragging
+          ? 'z-30 shadow-lg bg-ocar-soft border-ocar border-r-ocar ring-2 ring-ocar/30 cursor-grabbing'
+          : 'z-10 bg-ocar-soft/60 border-ocar/30 border-r-ocar/70 shadow-sm hover:bg-ocar-soft hover:border-ocar/50 cursor-grab'
       }`}
       style={{ top, height }}
       onPointerDown={(e) => onDragStart(e, item)}
       onClick={onClick}
       title="גרור כדי לשנות שעה · לחיצה לעריכה"
     >
-      <div className={`flex items-start gap-2 ${compact ? 'items-center' : ''}`}>
+      {/* Fixed header: time + title + price/photo */}
+      <div className={`flex-shrink-0 flex items-start gap-2 ${compact ? 'items-center' : ''}`}>
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-sm truncate flex items-center gap-2">
+          <div className="font-semibold text-sm text-ocar-dark truncate flex items-center gap-2">
             {item.title}
             {hasOptions && (
-              <span className="text-[10px] font-medium bg-ocar-soft text-ocar rounded-full px-1.5 py-0.5 whitespace-nowrap">
+              <span className="text-[10px] font-medium bg-white/80 text-ocar rounded-full px-1.5 py-0.5 whitespace-nowrap">
                 אפשרויות: {options.length}
               </span>
             )}
           </div>
           <div className="text-[11px] text-ocar font-medium"><bdi>{timingLabel(item) || '—'}</bdi></div>
-          {!compact && item.description && (
-            <div className="text-[11px] text-slate-500 line-clamp-1 break-words">{item.description}</div>
-          )}
         </div>
         {!hasOptions && item.photos?.[0] && !compact && (
           <img src={item.photos[0]} alt="" className="h-9 w-9 rounded object-cover flex-shrink-0" />
         )}
-        <div className="text-[11px] text-slate-600 whitespace-nowrap flex-shrink-0">
+        <div className="text-[11px] text-ocar-dark/80 whitespace-nowrap flex-shrink-0">
           {hasOptions ? formatRange(range.low, range.high) : formatPrice(item.price) || ''}
         </div>
       </div>
+      {/* Description: fills the remaining vertical space, clipped to fit */}
+      {!compact && item.description && (
+        <div className="flex-1 overflow-hidden min-h-0 mt-0.5 text-[11px] text-slate-600 break-words whitespace-pre-line leading-snug">
+          {item.description}
+        </div>
+      )}
     </div>
   );
 }
