@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { brand } from '../brand/brand.js';
-import { formatDuration, formatPrice, timingLabel, totalRange, whenLabel } from '../utils/format.js';
+import { formatDuration, formatPrice, timingLabel, total, whenLabel } from '../utils/format.js';
 
 export default function ProposalPreview() {
   const { id } = useParams();
@@ -13,7 +13,7 @@ export default function ProposalPreview() {
   if (!event) return <p className="p-8 text-slate-400">טוען…</p>;
 
   const items = event.items || [];
-  const { low, high } = totalRange(items);
+  const headTotal = total(items);
 
   return (
     <div className="min-h-screen bg-slate-100" dir="rtl">
@@ -56,7 +56,7 @@ export default function ProposalPreview() {
           {items.map((it) => (
             <div key={it.id} className="flex gap-4 print-break border-b border-slate-100 pb-3">
               <div className="min-w-[90px] text-center">
-                <div className="font-bold" style={{ color: brand.colors.primary }}>{timingLabel(it) || '—'}</div>
+                <div className="font-bold" style={{ color: brand.colors.primary }}><bdi>{timingLabel(it) || '—'}</bdi></div>
                 {it.approx_duration_hours ? (
                   <div className="text-xs text-slate-400">{formatDuration(it.approx_duration_hours)}</div>
                 ) : null}
@@ -66,27 +66,27 @@ export default function ProposalPreview() {
               )}
               <div className="flex-1">
                 <div className="font-semibold">{it.title}</div>
-                {it.description && <div className="text-sm text-slate-500">{it.description}</div>}
+                {it.description && <div className="text-sm text-slate-500 break-words">{it.description}</div>}
               </div>
-              {showPrices && it.show_price !== false && formatPrice(it.price_min, it.price_max) && (
-                <div className="text-sm font-medium whitespace-nowrap">{formatPrice(it.price_min, it.price_max)}</div>
+              {showPrices && it.show_price !== false && formatPrice(it.price) && (
+                <div className="text-sm font-medium whitespace-nowrap">{formatPrice(it.price)}</div>
               )}
             </div>
           ))}
         </div>
 
-        {showPrices && (high > 0 || low > 0) && (
+        {showPrices && headTotal > 0 && (
           <div className="mt-6 pt-4 border-t-2" style={{ borderColor: brand.colors.primary }}>
             <div className="flex justify-between items-center">
               <span className="font-bold text-lg">מחיר לאדם</span>
               <span className="font-extrabold text-lg" style={{ color: brand.colors.primary }}>
-                {formatPrice(low, high)}
+                {formatPrice(headTotal)}
               </span>
             </div>
             {event.group_size > 0 && (
               <div className="flex justify-between items-center text-slate-500 mt-1">
                 <span>סה״כ לקבוצה (×{event.group_size})</span>
-                <span className="font-medium">{formatPrice(low * event.group_size, high * event.group_size)}</span>
+                <span className="font-medium">{formatPrice(headTotal * event.group_size)}</span>
               </div>
             )}
           </div>
