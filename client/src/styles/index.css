@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-slate-50 text-slate-800 font-sans;
+}
+
+/* ---- Print: the proposal page becomes a clean A4 document ---- */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-page {
+    box-shadow: none !important;
+    margin: 0 !important;
+    width: auto !important;
+  }
+  .print-break {
+    break-inside: avoid;
+  }
+  body {
+    background: #fff;
+  }
+}

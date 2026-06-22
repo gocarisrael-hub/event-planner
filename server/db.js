@@ -1,0 +1,103 @@
+// Tiny JSON-file data store. No native deps — safe to install/run anywhere.
+// Collections: vendors, catalog (reusable activities), events (days), items (schedule blocks).
+import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = join(__dirname, 'data');
+const DATA_FILE = join(DATA_DIR, 'app.json');
+
+const EMPTY = { vendors: [], catalog: [], events: [], items: [] };
+
+function seed() {
+  const vBreakfast = { id: randomUUID(), name: 'קייטרינג בוקר טוב', contact: '', notes: '' };
+  const vDeadSea = { id: randomUUID(), name: 'סיורי ים המלח', contact: '', notes: '' };
+  return {
+    vendors: [vBreakfast, vDeadSea],
+    catalog: [
+      {
+        id: randomUUID(),
+        title: 'ארוחת בוקר',
+        description: 'ארוחת בוקר בופה עשירה לפתיחת היום',
+        category: 'אוכל',
+        default_duration_min: 60,
+        default_price_min: 45,
+        default_price_max: 60,
+        vendor_id: vBreakfast.id,
+        photos: [],
+        tags: ['בוקר', 'אוכל'],
+      },
+      {
+        id: randomUUID(),
+        title: 'טיול ים המלח',
+        description: 'טיול מודרך עם ציפה בים המלח',
+        category: 'אטרקציה',
+        default_duration_min: 180,
+        default_price_min: 120,
+        default_price_max: 160,
+        vendor_id: vDeadSea.id,
+        photos: [],
+        tags: ['טיול', 'מים'],
+      },
+    ],
+    events: [],
+    items: [],
+  };
+}
+
+function load() {
+  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+  if (!existsSync(DATA_FILE)) {
+    const initial = seed();
+    writeFileSync(DATA_FILE, JSON.stringify(initial, null, 2));
+    return initial;
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(DATA_FILE, 'utf8'));
+    return { ...EMPTY, ...parsed };
+  } catch {
+    return seed();
+  }
+}
+
+let db = load();
+
+function persist() {
+  writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
+}
+
+// Generic collection helpers ------------------------------------------------
+function col(name) {
+  return {
+    all: () => db[name],
+    find: (id) => db[name].find((r) => r.id === id),
+    where: (pred) => db[name].filter(pred),
+    insert: (data) => {
+      const row = { id: randomUUID(), ...data };
+      db[name].push(row);
+      persist();
+      return row;
+    },
+    update: (id, patch) => {
+      const row = db[name].find((r) => r.id === id);
+      if (!row) return null;
+      Object.assign(row, patch);
+      persist();
+      return row;
+    },
+    remove: (id) => {
+      const before = db[name].length;
+      db[name] = db[name].filter((r) => r.id !== id);
+      if (db[name].length !== before) persist();
+      return before !== db[name].length;
+    },
+  };
+}
+
+export const vendors = col('vendors');
+export const catalog = col('catalog');
+export const events = col('events');
+export const items = col('items');
+export { persist };
