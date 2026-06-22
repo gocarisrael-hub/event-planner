@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = join(__dirname, 'data');
+const DATA_DIR = process.env.DATA_DIR || join(__dirname, 'data');
 const DATA_FILE = join(DATA_DIR, 'app.json');
 
 const EMPTY = { categories: [], catalog: [], events: [], items: [] };

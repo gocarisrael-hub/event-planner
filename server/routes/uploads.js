@@ -1,12 +1,16 @@
 // Photo uploads (multer → server/uploads, served statically at /uploads).
 import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Router } from 'express';
 import multer from 'multer';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const UPLOAD_DIR = join(__dirname, '..', 'uploads');
+const UPLOAD_DIR = process.env.UPLOADS_DIR || join(__dirname, '..', 'uploads');
+
+// Ensure the upload target exists (e.g. a fresh Railway volume).
+if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),

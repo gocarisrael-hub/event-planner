@@ -16,7 +16,11 @@ async function getBrowser() {
 
   if (!browserPromise) {
     browserPromise = puppeteer
-      .launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] })
+      .launch({
+        headless: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      })
       .catch((err) => {
         browserPromise = null; // allow a retry on next call
         throw new Error(`PDF generation unavailable: could not launch headless Chromium (${err.message})`);
