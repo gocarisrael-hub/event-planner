@@ -4,6 +4,7 @@ import cors from 'cors';
 import express from 'express';
 import catalogRouter, { categoryRouter } from './routes/catalog.js';
 import eventsRouter from './routes/events.js';
+import gmailRouter from './routes/gmail.js';
 import uploadsRouter from './routes/uploads.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -22,6 +23,7 @@ app.use('/api/events', eventsRouter);
 app.use('/api/catalog', catalogRouter);
 app.use('/api/categories', categoryRouter);
 app.use('/api/uploads', uploadsRouter);
+app.use('/api/gmail', gmailRouter);
 
 app.listen(PORT, () => {
   console.log(`[event-planner] server on http://localhost:${PORT}`);
