@@ -71,6 +71,10 @@ function migrate(d) {
     }
   }
   for (const it of d.items || []) {
+    if (!Array.isArray(it.options)) {
+      it.options = [];
+      changed = true;
+    }
     if ('price_min' in it || 'price_max' in it) {
       if (it.price === undefined) {
         it.price = it.price_min ?? it.price_max ?? null;
