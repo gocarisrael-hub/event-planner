@@ -91,12 +91,14 @@ export default function DayBuilder() {
   const dragRef = useRef(null); // { id, startY, startTop, dur, moved }
   const trackRef = useRef(null);
 
-  useEffect(() => { load(id); }, [id]);
+  // Reset the one-time seeding flag whenever we switch to a different day,
+  // so legacy items on the newly-loaded day also get positioned.
+  const seeded = useRef(false);
+  useEffect(() => { seeded.current = false; load(id); }, [id]);
   useEffect(() => { loadCatalog(); }, []);
 
   // Legacy/edge items without a start: stack them onto the timeline so every
-  // item is positioned. Runs once after items load.
-  const seeded = useRef(false);
+  // item is positioned. Runs once after items load (per day).
   useEffect(() => {
     if (loading || !event || seeded.current) return;
     seeded.current = true;

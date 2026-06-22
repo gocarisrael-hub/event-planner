@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useCatalogStore } from '../store/useCatalogStore.js';
 import { useEventStore } from '../store/useEventStore.js';
 import { formatPrice } from '../utils/format.js';
+import { DAY_END_MIN, startToMinutes } from '../utils/timeline.js';
 import CategorySelect from './CategorySelect.jsx';
 import PhotoUploader from './PhotoUploader.jsx';
 
@@ -117,7 +118,13 @@ export default function TimelineItem({ item, onChange, onRemove, onClose }) {
             <label className="text-xs text-slate-500">
               משך (שעות)
               <input type="number" step="0.5" min="0" className={field} value={item.approx_duration_hours ?? ''}
-                onChange={(e) => set({ approx_duration_hours: e.target.value ? Number(e.target.value) : null })} />
+                onChange={(e) => {
+                  let v = e.target.value ? Number(e.target.value) : null;
+                  // Don't let a duration push the block past midnight.
+                  const s = startToMinutes(item.approx_start);
+                  if (v && s !== null) v = Math.min(v, (DAY_END_MIN - s) / 60);
+                  set({ approx_duration_hours: v });
+                }} />
             </label>
             <label className="text-xs text-slate-500">
               קטגוריה
