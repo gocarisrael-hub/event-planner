@@ -49,10 +49,18 @@ export default function DayBuilder() {
       if (res && res.link) {
         setDraftLink(res.link);
       } else {
-        setDraftError(res && res.error ? res.error : 'צריך לחבר את Gmail קודם');
+        setDraftError('לא הצלחנו להכין טיוטה. נסו שוב.');
       }
-    } catch {
-      setDraftError('צריך לחבר את Gmail קודם');
+    } catch (e) {
+      // Backend errors arrive as non-2xx; req() attaches the server code/message.
+      const map = {
+        no_linked_email: 'אין מייל מקושר ליום הזה.',
+        gmail_not_configured: 'חיבור ה-Gmail עדיין לא מוגדר בצד השרת.',
+        gmail_not_connected: 'צריך לחבר את Gmail קודם (במסך "מיילים").',
+        pdf_unavailable: 'יצירת ה-PDF נכשלה בשרת.',
+        gmail_error: 'שגיאה מול Gmail. נסו שוב.',
+      };
+      setDraftError(map[e?.serverMessage] || e?.serverMessage || 'לא הצלחנו להכין טיוטה. ודאו שה-Gmail מחובר.');
     } finally {
       setDraftPending(false);
     }

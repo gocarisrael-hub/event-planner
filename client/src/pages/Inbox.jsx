@@ -17,6 +17,7 @@ export default function Inbox() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [creatingId, setCreatingId] = useState(null);
   const [error, setError] = useState('');
+  const [polling, setPolling] = useState(false);
   const pollRef = useRef(null);
 
   const clearPoll = () => {
@@ -85,15 +86,23 @@ export default function Inbox() {
       setNotConfigured(true);
       return;
     }
-    window.open(url, 'gmail', 'width=520,height=640');
+    const popup = window.open(url, 'gmail', 'width=520,height=640');
     // Poll until the popup completes the OAuth flow.
     clearPoll();
+    setPolling(true);
     pollRef.current = setInterval(async () => {
       const connected = await checkStatus();
       if (connected) {
         clearPoll();
+        setPolling(false);
         setStatus('connected');
         loadMessages();
+        return;
+      }
+      // Popup closed without authorizing → stop polling instead of looping forever.
+      if (popup && popup.closed) {
+        clearPoll();
+        setPolling(false);
       }
     }, 3000);
   };
@@ -144,7 +153,7 @@ export default function Inbox() {
               >
                 התחבר ל-Gmail
               </button>
-              {pollRef.current && (
+              {polling && (
                 <p className="text-xs text-slate-400 mt-3">ממתינים לאישור החיבור בחלון שנפתח…</p>
               )}
             </>
