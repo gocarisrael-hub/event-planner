@@ -161,8 +161,8 @@ router.post('/items/:itemId/options', (req, res) => {
       option = {
         ...option,
         title: c.title,
-        description: c.description,
-        price: c.default_price,
+        description: c.description || '',
+        price: c.default_price ?? null,
         photos: c.photos || [],
         contact_name: c.contact_name || '',
         contact_phone: c.contact_phone || '',
@@ -193,13 +193,13 @@ router.post('/items/:itemId/options', (req, res) => {
 router.patch('/items/:itemId/options/:optionId', (req, res) => {
   const item = items.find(req.params.itemId);
   if (!item) return res.status(404).json({ error: 'not found' });
+  const exists = (item.options || []).some((o) => o.id === req.params.optionId);
+  if (!exists) return res.status(404).json({ error: 'not found' });
   const options = (item.options || []).map((o) =>
     o.id === req.params.optionId ? { ...o, ...(req.body || {}) } : o,
   );
   items.update(item.id, { options });
-  const option = options.find((o) => o.id === req.params.optionId);
-  if (!option) return res.status(404).json({ error: 'not found' });
-  res.json(option);
+  res.json(options.find((o) => o.id === req.params.optionId));
 });
 
 router.delete('/items/:itemId/options/:optionId', (req, res) => {
