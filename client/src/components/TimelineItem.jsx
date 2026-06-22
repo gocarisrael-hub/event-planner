@@ -131,9 +131,7 @@ export default function TimelineItem({ item, onChange, onRemove }) {
           <img src={item.photos[0]} alt="" className="h-10 w-10 rounded object-cover" />
         )}
         <div className="text-sm text-slate-600 whitespace-nowrap">
-          {item.show_price === false ? (
-            <span className="text-slate-300">ללא מחיר</span>
-          ) : hasOptions ? (
+          {hasOptions ? (
             formatRange(range.low, range.high)
           ) : (
             formatPrice(item.price) || '—'
@@ -196,11 +194,6 @@ export default function TimelineItem({ item, onChange, onRemove }) {
               מחיר (₪)
               <input type="number" className={field} value={item.price ?? ''}
                 onChange={(e) => set({ price: e.target.value ? Number(e.target.value) : null })} />
-            </label>
-            <label className="text-xs text-slate-500 flex items-center gap-2 pb-1">
-              <input type="checkbox" checked={item.show_price !== false}
-                onChange={(e) => set({ show_price: e.target.checked })} />
-              הצג מחיר בלו״ז/PDF
             </label>
           </div>
 

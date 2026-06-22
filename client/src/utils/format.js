@@ -48,14 +48,13 @@ export function timingLabel(item) {
   return '';
 }
 
-// Sum the schedule into a per-head price range (only items with show_price).
+// Sum the schedule into a per-head price range.
 // A choice block (with options) contributes cheapest–priciest; a plain item
 // contributes its single price to both ends (low===high).
 export function total(items) {
   let low = 0;
   let high = 0;
   for (const it of items) {
-    if (it.show_price === false) continue;
     if (it.options?.length) {
       const prices = it.options.map((o) => Number(o.price) || 0);
       low += Math.min(...prices);

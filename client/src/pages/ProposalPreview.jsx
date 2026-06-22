@@ -10,6 +10,14 @@ export default function ProposalPreview() {
   const [showPrices, setShowPrices] = useState(true);
 
   useEffect(() => { api.getEvent(id).then(setEvent); }, [id]);
+
+  // State updates are async; defer print so the DOM reflects the chosen
+  // prices view before the print dialog snapshots it.
+  const printWith = (withPrices) => {
+    setShowPrices(withPrices);
+    setTimeout(() => window.print(), 150);
+  };
+
   if (!event) return <p className="p-8 text-slate-400">טוען…</p>;
 
   const items = event.items || [];
@@ -20,13 +28,14 @@ export default function ProposalPreview() {
       {/* Toolbar — hidden when printing */}
       <div className="no-print sticky top-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
         <Link to={`/day/${id}`} className="text-sm text-slate-400 hover:text-ocar">← חזרה לבנייה</Link>
-        <label className="flex items-center gap-2 text-sm mr-auto">
-          <input type="checkbox" checked={showPrices} onChange={(e) => setShowPrices(e.target.checked)} />
-          הצג מחירים
-        </label>
-        <button onClick={() => window.print()} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90">
-          הורד PDF / הדפס
-        </button>
+        <div className="flex items-center gap-2 mr-auto">
+          <button onClick={() => printWith(true)} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90">
+            הורד / הדפס PDF עם מחירים
+          </button>
+          <button onClick={() => printWith(false)} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft">
+            הורד / הדפס PDF בלי מחירים
+          </button>
+        </div>
       </div>
 
       {/* The document */}
@@ -69,7 +78,7 @@ export default function ProposalPreview() {
                   <div className="font-semibold">{it.title}</div>
                   {it.description && <div className="text-sm text-slate-500 break-words">{it.description}</div>}
                 </div>
-                {showPrices && it.show_price !== false && !it.options?.length && formatPrice(it.price) && (
+                {showPrices && !it.options?.length && formatPrice(it.price) && (
                   <div className="text-sm font-medium whitespace-nowrap">{formatPrice(it.price)}</div>
                 )}
               </div>
@@ -86,7 +95,7 @@ export default function ProposalPreview() {
                         <div className="flex-1 min-w-0">
                           <div className="flex justify-between items-start gap-2">
                             <div className="font-semibold">{o.title}</div>
-                            {showPrices && it.show_price !== false && formatPrice(o.price) && (
+                            {showPrices && formatPrice(o.price) && (
                               <div className="text-sm font-medium whitespace-nowrap">{formatPrice(o.price)}</div>
                             )}
                           </div>

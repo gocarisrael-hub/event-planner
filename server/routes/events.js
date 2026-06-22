@@ -117,7 +117,6 @@ router.post('/:id/items', (req, res) => {
   const item = items.insert({
     event_id: event.id,
     order_index,
-    show_price: b.show_price ?? true,
     approx_start: b.approx_start || null,
     time_note: b.time_note || '',
     notes: b.notes || '',
