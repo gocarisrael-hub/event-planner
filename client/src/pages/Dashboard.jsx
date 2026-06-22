@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { whenLabel } from '../utils/format.js';
@@ -6,6 +6,7 @@ import { whenLabel } from '../utils/format.js';
 export default function Dashboard() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -14,6 +15,15 @@ export default function Dashboard() {
       setLoading(false);
     });
   }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return events;
+    return events.filter((ev) => {
+      const fields = [ev.title, ev.client_name, ev.audience];
+      return fields.some((f) => (f || '').toLowerCase().includes(q));
+    });
+  }, [events, query]);
 
   const remove = async (e, id) => {
     e.preventDefault();
@@ -34,6 +44,16 @@ export default function Dashboard() {
         </button>
       </div>
 
+      {!loading && events.length > 0 && (
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="חיפוש לפי שם היום או הצוות…"
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 mb-6 focus:outline-none focus:border-ocar"
+        />
+      )}
+
       {loading ? (
         <p className="text-slate-400">טוען…</p>
       ) : events.length === 0 ? (
@@ -43,9 +63,13 @@ export default function Dashboard() {
             בוא נבנה את הראשון →
           </button>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center">
+          <p className="text-slate-500">לא נמצאו ימים שמתאימים לחיפוש.</p>
+        </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {events.map((ev) => (
+          {filtered.map((ev) => (
             <Link
               key={ev.id}
               to={`/day/${ev.id}`}
