@@ -8,14 +8,32 @@ export default function ProposalPreview() {
   const { id } = useParams();
   const [event, setEvent] = useState(null);
   const [showPrices, setShowPrices] = useState(true);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => { api.getEvent(id).then(setEvent); }, [id]);
 
-  // State updates are async; defer print so the DOM reflects the chosen
-  // prices view before the print dialog snapshots it.
-  const printWith = (withPrices) => {
-    setShowPrices(withPrices);
-    setTimeout(() => window.print(), 150);
+  // Download the server-rendered PDF (clean A4 Hebrew) instead of printing.
+  const downloadPdf = async (withPrices) => {
+    setError('');
+    setPending(true);
+    try {
+      const res = await fetch(`/api/events/${id}/proposal.pdf?prices=${withPrices}`);
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'הצעה.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('יצירת ה-PDF נכשלה');
+    } finally {
+      setPending(false);
+    }
   };
 
   if (!event) return <p className="p-8 text-slate-400">טוען…</p>;
@@ -29,11 +47,13 @@ export default function ProposalPreview() {
       <div className="no-print sticky top-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
         <Link to={`/day/${id}`} className="text-sm text-slate-400 hover:text-ocar">← חזרה לבנייה</Link>
         <div className="flex items-center gap-2 mr-auto">
-          <button onClick={() => printWith(true)} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90">
-            הורד / הדפס PDF עם מחירים
+          {error && <span className="text-sm text-red-500">{error}</span>}
+          {pending && <span className="text-sm text-slate-400">יוצר PDF…</span>}
+          <button onClick={() => downloadPdf(true)} disabled={pending} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
+            הורד PDF עם מחירים
           </button>
-          <button onClick={() => printWith(false)} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft">
-            הורד / הדפס PDF בלי מחירים
+          <button onClick={() => downloadPdf(false)} disabled={pending} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
+            הורד PDF בלי מחירים
           </button>
         </div>
       </div>
