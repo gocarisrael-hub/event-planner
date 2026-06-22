@@ -309,7 +309,7 @@ function createDay(e) {
     .setNotification(
       CardService.newNotification().setText('היום נוצר ב-Ocar')
     )
-    .setNavigation(CardService.newNavigation().pushCard(card))
+    .setOpenLink(CardService.newOpenLink().setUrl(data.url || conf.backendUrl))
     .build();
 }
 
@@ -404,7 +404,7 @@ function linkDay(e) {
     .setNotification(
       CardService.newNotification().setText('המייל קושר ליום')
     )
-    .setNavigation(CardService.newNavigation().pushCard(card))
+    .setOpenLink(CardService.newOpenLink().setUrl(data.url || conf.backendUrl))
     .build();
 }
 
