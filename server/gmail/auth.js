@@ -9,7 +9,9 @@ import { google } from 'googleapis';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CREDENTIALS_FILE = join(__dirname, 'credentials.json');
-const TOKEN_FILE = join(__dirname, '..', 'data', 'gmail-token.json');
+const TOKEN_FILE = process.env.DATA_DIR
+  ? join(process.env.DATA_DIR, 'gmail-token.json')
+  : join(__dirname, '..', 'data', 'gmail-token.json');
 
 export const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
