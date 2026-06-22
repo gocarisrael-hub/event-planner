@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client.js';
+import { useUnsavedStore } from '../store/useUnsavedStore.js';
 import { MONTHS, SEASONS } from '../utils/format.js';
 
 const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-ocar';
 
 export default function NewDay() {
   const navigate = useNavigate();
+  const setDirty = useUnsavedStore((s) => s.setDirty);
   const [whenMode, setWhenMode] = useState('date'); // date | month | season
   const [form, setForm] = useState({
     title: '',
@@ -22,8 +24,18 @@ export default function NewDay() {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  // Mark the page as dirty whenever any field has content; clear when empty.
+  useEffect(() => {
+    const hasContent = Object.values(form).some((v) => String(v).trim() !== '');
+    setDirty(hasContent);
+  }, [form, setDirty]);
+
+  // Leaving the page normally (unmount) clears the flag.
+  useEffect(() => () => setDirty(false), [setDirty]);
+
   const submit = async (e) => {
     e.preventDefault();
+    setDirty(false);
     const payload = {
       ...form,
       group_size: form.group_size ? Number(form.group_size) : null,
