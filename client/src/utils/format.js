@@ -37,7 +37,6 @@ export function formatDuration(hours) {
 
 // What to show on the timeline for an item's timing.
 export function timingLabel(item) {
-  if (item.approx_start && item.approx_end) return `${item.approx_start}–${item.approx_end}`;
   if (item.approx_start && item.approx_duration_hours) {
     const end = addHours(item.approx_start, item.approx_duration_hours);
     return end ? `${item.approx_start}–${end}` : item.approx_start;
@@ -46,6 +45,29 @@ export function timingLabel(item) {
   if (item.time_note) return item.time_note;
   if (item.approx_duration_hours) return `~${formatDuration(item.approx_duration_hours)}`;
   return '';
+}
+
+// Minutes since midnight for an "HH:MM" start string, or null if unset/invalid.
+export function startMinutes(timeStr) {
+  if (timeStr === null || timeStr === undefined || timeStr === '') return null;
+  const parts = String(timeStr).trim().split(':');
+  const h = Number(parts[0]);
+  const m = parts.length > 1 ? Number(parts[1]) : 0;
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  return h * 60 + m;
+}
+
+// Items ordered by their start time. Items without a start sink to the end
+// (keeping their relative order_index). Does not mutate the input.
+export function sortByStart(items) {
+  return [...items].sort((a, b) => {
+    const am = startMinutes(a.approx_start);
+    const bm = startMinutes(b.approx_start);
+    if (am === null && bm === null) return (a.order_index ?? 0) - (b.order_index ?? 0);
+    if (am === null) return 1;
+    if (bm === null) return -1;
+    return am - bm;
+  });
 }
 
 // Sum the schedule into a per-head price range.
