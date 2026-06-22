@@ -1,0 +1,27 @@
+name: CI
+
+# Runs on every PR and on pushes to non-main branches.
+# This is the merge gate: a PR should not be merged until CI is green.
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install (workspaces)
+        run: npm install
+      - name: Build client
+        run: npm run build
+      - name: Server syntax check
+        run: |
+          node --check server/index.js
+          node --check server/db.js

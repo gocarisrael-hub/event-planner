@@ -1,0 +1,31 @@
+name: Deploy
+
+# MANUAL ONLY. This never runs automatically — deploys happen only when a
+# human clicks "Run workflow" in the Actions tab. Keeps deploys in your hands.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm a production deploy'
+        required: true
+        default: ''
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ github.event.inputs.confirm == 'deploy' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway up --service "${{ vars.RAILWAY_SERVICE || 'event-planner' }}" --ci
