@@ -19,6 +19,9 @@ jobs:
           cache: 'npm'
       - name: Install (workspaces)
         run: npm install
+        env:
+          # CI only builds the client; skip Puppeteer's Chromium download.
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
       - name: Build client
         run: npm run build
       - name: Server syntax check
