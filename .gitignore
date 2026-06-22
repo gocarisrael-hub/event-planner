@@ -16,3 +16,8 @@ server/data/*.json.bak
 # Gmail integration secrets
 server/gmail/credentials.json
 server/data/gmail-token.json
+
+# Never commit OAuth/client secret JSON anywhere (example file is allowed)
+**/credentials*.json
+!**/credentials.example.json
+assets/credentials.json.json
