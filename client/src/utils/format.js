@@ -70,22 +70,28 @@ export function sortByStart(items) {
   });
 }
 
-// Sum the schedule into a per-head price range.
-// A choice block (with options) contributes cheapest–priciest; a plain item
-// contributes its single price to both ends (low===high).
+// Price range for a single item. Spans the item's OWN price AND its option
+// prices (skipping blank/zero). A plain item (no options) → low===high===price.
+// A choice block → cheapest–priciest over item.price + option prices.
+export function priceRange(item) {
+  const prices = [];
+  if (Number(item.price) > 0) prices.push(Number(item.price));
+  for (const o of item.options || []) {
+    if (Number(o.price) > 0) prices.push(Number(o.price));
+  }
+  if (!prices.length) return { low: 0, high: 0 };
+  return { low: Math.min(...prices), high: Math.max(...prices) };
+}
+
+// Sum the schedule into a per-head price range by summing each item's
+// priceRange (so choice blocks span item.price + option prices).
 export function total(items) {
   let low = 0;
   let high = 0;
   for (const it of items) {
-    if (it.options?.length) {
-      const prices = it.options.map((o) => Number(o.price) || 0);
-      low += Math.min(...prices);
-      high += Math.max(...prices);
-    } else {
-      const p = Number(it.price) || 0;
-      low += p;
-      high += p;
-    }
+    const r = priceRange(it);
+    low += r.low;
+    high += r.high;
   }
   return { low, high };
 }
