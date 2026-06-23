@@ -28,4 +28,4 @@ jobs:
       - name: Deploy to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --service "${{ vars.RAILWAY_SERVICE || 'event-planner' }}" --ci
+        run: railway up --service "${{ vars.RAILWAY_SERVICE || 'server' }}" --ci
