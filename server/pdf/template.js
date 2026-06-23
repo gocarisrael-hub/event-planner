@@ -2,37 +2,6 @@
 // Self-contained: RTL, lang=he, embedded CSS, Heebo via Google Fonts.
 // When { prices:false } no prices/totals are rendered (reply PDF is always
 // prices=false).
-import { readFileSync } from 'node:fs';
-import { basename, dirname, extname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-// Resolve uploads the same way server/routes/uploads.js does so a stored photo
-// path like "/uploads/<file>" maps to "<UPLOADS_DIR>/<basename>".
-const UPLOAD_DIR = process.env.UPLOADS_DIR || join(__dirname, '..', 'uploads');
-
-const MIME_BY_EXT = {
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.png': 'image/png',
-  '.webp': 'image/webp',
-};
-
-// Read a stored photo path off disk and return a base64 data URI, or '' if the
-// file is missing/unreadable. Puppeteer's setContent has no base URL, so
-// relative "/uploads/..." paths never load — embedding the bytes is robust.
-function dataUri(src) {
-  if (!src) return '';
-  const mime = MIME_BY_EXT[extname(src).toLowerCase()];
-  if (!mime) return '';
-  try {
-    const buf = readFileSync(join(UPLOAD_DIR, basename(src)));
-    return `data:${mime};base64,${buf.toString('base64')}`;
-  } catch {
-    return '';
-  }
-}
-
 const BRAND = {
   name: 'Ocar',
   tagline: 'בונים ימי כיף וימי גיבוש',
@@ -106,19 +75,26 @@ function sortByStart(list) {
   });
 }
 
+// Price range for a single item: spans the item's OWN price AND option prices
+// (skipping blank/zero). Plain item → low===high===price. Mirrors
+// client/src/utils/format.js priceRange.
+function priceRange(item) {
+  const prices = [];
+  if (Number(item.price) > 0) prices.push(Number(item.price));
+  for (const o of item.options || []) {
+    if (Number(o.price) > 0) prices.push(Number(o.price));
+  }
+  if (!prices.length) return { low: 0, high: 0 };
+  return { low: Math.min(...prices), high: Math.max(...prices) };
+}
+
 function total(items) {
   let low = 0;
   let high = 0;
   for (const it of items) {
-    if (it.options?.length) {
-      const ps = it.options.map((o) => Number(o.price) || 0);
-      low += Math.min(...ps);
-      high += Math.max(...ps);
-    } else {
-      const p = Number(it.price) || 0;
-      low += p;
-      high += p;
-    }
+    const r = priceRange(it);
+    low += r.low;
+    high += r.high;
   }
   return { low, high };
 }
@@ -142,15 +118,17 @@ function esc(s) {
 }
 
 // Photo paths are stored as "/uploads/x.jpg". Puppeteer's setContent has no
-// base URL, so we embed each photo as a base64 data URI read from disk. If the
-// file is missing/unreadable, omit the <img> entirely (no crash, no blank box).
-function img(src, cls) {
-  const uri = dataUri(src);
+// base URL, so each photo is pre-resized/encoded into a base64 data URI by
+// generate.js and passed in via the `photos` map (keyed by the original stored
+// path). If a path isn't in the map, omit the <img> entirely.
+function img(src, cls, photos) {
+  const uri = src && photos ? photos[src] : '';
   if (!uri) return '';
   return `<img class="${cls}" src="${uri}" alt="" />`;
 }
 
-export function proposalHtml(event, { prices } = { prices: false }) {
+export function proposalHtml(event, { prices, photos } = { prices: false, photos: {} }) {
+  const photoMap = photos || {};
   const items = sortByStart(event.items || []);
   const { low, high } = total(items);
   const showPrices = Boolean(prices);
@@ -167,17 +145,16 @@ export function proposalHtml(event, { prices } = { prices: false }) {
     const hasOptions = it.options?.length > 0;
 
     const mainPhoto = !hasOptions && it.photos?.[0]
-      ? img(it.photos[0], 'item-photo')
+      ? img(it.photos[0], 'item-photo', photoMap)
       : '';
 
-    // Choice-block items have a price RANGE (cheapest–priciest option), mirroring
-    // the client `total`/`formatRange`. Plain items show their single price.
+    // Choice-block items have a price RANGE spanning item.price + option prices
+    // (skipping blank/zero), mirroring the client `priceRange`/`formatRange`.
+    // Plain items show their single price.
     let slotPrice = '';
     if (showPrices) {
       if (hasOptions) {
-        const ps = it.options.map((o) => Number(o.price) || 0);
-        const lo = Math.min(...ps);
-        const hi = Math.max(...ps);
+        const { low: lo, high: hi } = priceRange(it);
         slotPrice = `<div class="item-price">${esc(formatRange(lo, hi))}</div>`;
       } else if (formatPrice(it.price)) {
         slotPrice = `<div class="item-price">${esc(formatPrice(it.price))}</div>`;
@@ -190,7 +167,7 @@ export function proposalHtml(event, { prices } = { prices: false }) {
         const oPrice = showPrices && formatPrice(o.price)
           ? `<div class="opt-price">${esc(formatPrice(o.price))}</div>`
           : '';
-        const oPhoto = o.photos?.[0] ? img(o.photos[0], 'opt-photo') : '';
+        const oPhoto = o.photos?.[0] ? img(o.photos[0], 'opt-photo', photoMap) : '';
         const contact = [o.contact_name, o.contact_phone].filter(Boolean).join(' · ');
         return `
           <div class="opt">

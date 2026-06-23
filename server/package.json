@@ -11,6 +11,7 @@
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "googleapis": "^173.0.0",
+    "jimp": "^1.6.1",
     "multer": "^2.0.0",
     "puppeteer": "^25.1.0"
   }

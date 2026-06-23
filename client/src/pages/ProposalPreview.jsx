@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { brand } from '../brand/brand.js';
-import { formatDuration, formatPrice, formatRange, sortByStart, timingLabel, total, whenLabel } from '../utils/format.js';
+import { formatDuration, formatPrice, formatRange, priceRange, sortByStart, timingLabel, total, whenLabel } from '../utils/format.js';
 
 export default function ProposalPreview() {
   const { id } = useParams();
@@ -114,8 +114,8 @@ export default function ProposalPreview() {
                   <div className="text-sm font-medium whitespace-nowrap">{formatPrice(it.price)}</div>
                 )}
                 {showPrices && it.options?.length > 0 && (() => {
-                  // Choice-block slot price is a range (cheapest–priciest option).
-                  const { low: lo, high: hi } = total([it]);
+                  // Choice-block slot price is a range spanning item.price + option prices.
+                  const { low: lo, high: hi } = priceRange(it);
                   return <div className="text-sm font-medium whitespace-nowrap">{formatRange(lo, hi)}</div>;
                 })()}
               </div>
