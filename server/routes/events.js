@@ -73,8 +73,8 @@ router.get('/:id/proposal.pdf', async (req, res) => {
     .replace(/\s+/g, ' ')
     .trim();
   let name;
-  if (!base) name = prices ? 'הצעה.pdf' : 'הצעה (ללא מחירים).pdf';
-  else name = prices ? `הצעה – ${base}.pdf` : `הצעה – ${base} (ללא מחירים).pdf`;
+  if (!base) name = prices ? 'הצעה (עם מחירים).pdf' : 'הצעה.pdf';
+  else name = prices ? `הצעה – ${base} (עם מחירים).pdf` : `הצעה – ${base}.pdf`;
   const utf8Name = encodeURIComponent(name);
   res.set('Content-Type', 'application/pdf');
   res.set(

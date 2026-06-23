@@ -21,8 +21,8 @@ export default function ProposalPreview() {
       .replace(/[/\\:*?"<>|\x00-\x1f]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    if (!base) return withPrices ? 'הצעה.pdf' : 'הצעה (ללא מחירים).pdf';
-    return withPrices ? `הצעה – ${base}.pdf` : `הצעה – ${base} (ללא מחירים).pdf`;
+    if (!base) return withPrices ? 'הצעה (עם מחירים).pdf' : 'הצעה.pdf';
+    return withPrices ? `הצעה – ${base} (עם מחירים).pdf` : `הצעה – ${base}.pdf`;
   };
 
   // Download the server-rendered PDF (clean A4 Hebrew) instead of printing.
