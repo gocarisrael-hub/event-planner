@@ -51,10 +51,13 @@ function TimelineBlock({ item, onDragStart, onClick, dragging, top }) {
   // inline below) so the clamped box is always a clean multiple of it and the
   // block's overflow:hidden never slices through the middle of a line.
   const LINE_PX = 15;
-  const HEADER_PX = 38;
-  const PADDING_PX = 12;
-  const descAreaPx = height - HEADER_PX - PADDING_PX;
-  const descLines = Math.max(1, Math.floor(descAreaPx / LINE_PX));
+  // Space taken above/below the description: top padding + title line + time
+  // line + the mt-0.5 gap (~40px) plus bottom padding (~6px). If less than one
+  // WHOLE line is left, we show no description at all — never a half-cut line.
+  const RESERVED_PX = 52;
+  const descAreaPx = height - RESERVED_PX;
+  const descLines = Math.floor(descAreaPx / LINE_PX);
+  const showDesc = !compact && Boolean(item.description) && descLines >= 1;
 
   return (
     <div
@@ -88,8 +91,8 @@ function TimelineBlock({ item, onDragStart, onClick, dragging, top }) {
           {hasOptions ? formatRange(range.low, range.high) : formatPrice(item.price) || ''}
         </div>
       </div>
-      {/* Description: clamped to the whole lines that fit, ending with "…". */}
-      {!compact && item.description && (
+      {/* Description: only when at least one whole line fits; clamped, "…". */}
+      {showDesc && (
         <div
           className="min-h-0 mt-0.5 text-[11px] text-slate-600 break-words"
           style={{
