@@ -6,7 +6,6 @@ import Catalog from './pages/Catalog.jsx';
 import Categories from './pages/Categories.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import DayBuilder from './pages/DayBuilder.jsx';
-import Inbox from './pages/Inbox.jsx';
 import NewDay from './pages/NewDay.jsx';
 import ProposalPreview from './pages/ProposalPreview.jsx';
 import './styles/index.css';
@@ -20,7 +19,6 @@ const router = createBrowserRouter([
       { path: '/day/:id', element: <DayBuilder /> },
       { path: '/catalog', element: <Catalog /> },
       { path: '/categories', element: <Categories /> },
-      { path: '/inbox', element: <Inbox /> },
     ],
   },
   // Standalone print page (no app chrome).
