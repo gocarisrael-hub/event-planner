@@ -295,7 +295,7 @@ function createDay(e) {
           CardService.newTextButton()
             .setText('פתח את היום')
             .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-            .setOpenLink(CardService.newOpenLink().setUrl(data.url || conf.backendUrl))
+            .setOpenLink(CardService.newOpenLink().setUrl(data.url || conf.backendUrl).setOpenAs(CardService.OpenAs.FULL_SIZE).setOnClose(CardService.OnClose.NOTHING))
         )
         .addWidget(
           CardService.newTextButton()
@@ -309,7 +309,7 @@ function createDay(e) {
     .setNotification(
       CardService.newNotification().setText('היום נוצר ב-Ocar')
     )
-    .setOpenLink(CardService.newOpenLink().setUrl(data.url || conf.backendUrl))
+    .setOpenLink(CardService.newOpenLink().setUrl(data.url || conf.backendUrl).setOpenAs(CardService.OpenAs.FULL_SIZE).setOnClose(CardService.OnClose.NOTHING))
     .build();
 }
 
@@ -390,7 +390,7 @@ function linkDay(e) {
           CardService.newTextButton()
             .setText('פתח את היום')
             .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-            .setOpenLink(CardService.newOpenLink().setUrl(data.url || conf.backendUrl))
+            .setOpenLink(CardService.newOpenLink().setUrl(data.url || conf.backendUrl).setOpenAs(CardService.OpenAs.FULL_SIZE).setOnClose(CardService.OnClose.NOTHING))
         )
         .addWidget(
           CardService.newTextButton()
@@ -404,7 +404,7 @@ function linkDay(e) {
     .setNotification(
       CardService.newNotification().setText('המייל קושר ליום')
     )
-    .setOpenLink(CardService.newOpenLink().setUrl(data.url || conf.backendUrl))
+    .setOpenLink(CardService.newOpenLink().setUrl(data.url || conf.backendUrl).setOpenAs(CardService.OpenAs.FULL_SIZE).setOnClose(CardService.OnClose.NOTHING))
     .build();
 }
 
