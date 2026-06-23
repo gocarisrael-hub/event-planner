@@ -5,6 +5,9 @@ export const brand = {
   name: 'Ocar',
   tagline: 'בונים ימי כיף וימי גיבוש',
   logoUrl: '/brand/ocar-logo.png',
+  // The real mailbox used for replies / opening messages. Forces the right
+  // Google account via ?authuser= even when signed into multiple accounts.
+  gmailAccount: 'gocarisrael@gmail.com',
   // Colors sampled from the Ocar logo: black emblem + red star.
   colors: {
     primary: '#e00f19',

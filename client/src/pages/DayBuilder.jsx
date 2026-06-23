@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client.js';
+import { brand } from '../brand/brand.js';
 import AddActivityRow from '../components/AddActivityRow.jsx';
 import BudgetMeter from '../components/BudgetMeter.jsx';
 import DatePicker from '../components/DatePicker.jsx';
@@ -244,6 +245,14 @@ export default function DayBuilder() {
   const [editingId, setEditingId] = useState(null);
   const [editDay, setEditDay] = useState(false);
 
+  // Gmail connect flow (lazily shown when a reply fails because the SERVER
+  // isn't connected). Mirrors the old Inbox page's connect/poll pattern.
+  const [showConnect, setShowConnect] = useState(false); // offer "התחבר ל-Gmail"
+  const [connecting, setConnecting] = useState(false); // popup open + polling
+  const [gmailNotConfigured, setGmailNotConfigured] = useState(false);
+  const pollRef = useRef(null);
+  const mountedRef = useRef(true);
+
   // Transient drag state: which item, its live top (px), and whether a real
   // drag happened (to suppress the click-to-edit on release).
   const [drag, setDrag] = useState(null); // { id, top }
@@ -255,6 +264,18 @@ export default function DayBuilder() {
   const seeded = useRef(false);
   useEffect(() => { seeded.current = false; load(id); }, [id]);
   useEffect(() => { loadCatalog(); }, []);
+
+  // Stop any Gmail status poll and block setState on unmount (no leaks).
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, []);
 
   // Legacy/edge items without a start: stack them onto the timeline so every
   // item is positioned. Runs once after items load (per day).
@@ -348,10 +369,13 @@ export default function DayBuilder() {
     setDraftPending(true);
     setDraftError('');
     setDraftLink('');
+    let ok = false;
     try {
       const res = await api.gmailDraftReply(event.id);
       if (res && res.link) {
         setDraftLink(res.link);
+        setShowConnect(false); // we're connected — hide the connect button
+        ok = true;
       } else {
         setDraftError('לא הצלחנו להכין טיוטה. נסו שוב.');
       }
@@ -359,14 +383,63 @@ export default function DayBuilder() {
       const map = {
         no_linked_email: 'אין מייל מקושר ליום הזה.',
         gmail_not_configured: 'חיבור ה-Gmail עדיין לא מוגדר בצד השרת.',
-        gmail_not_connected: 'צריך לחבר את Gmail קודם (במסך "מיילים").',
+        gmail_not_connected: 'צריך לחבר את Gmail קודם.',
         pdf_unavailable: 'יצירת ה-PDF נכשלה בשרת.',
         gmail_error: 'שגיאה מול Gmail. נסו שוב.',
       };
+      // 409 from the backend when the server-side Gmail isn't ready: either it
+      // needs connecting (offer the connect button) or it isn't configured.
+      if (e?.serverMessage === 'gmail_not_connected') {
+        setShowConnect(true);
+        setGmailNotConfigured(false);
+      } else if (e?.serverMessage === 'gmail_not_configured') {
+        setShowConnect(true);
+        setGmailNotConfigured(true);
+      }
       setDraftError(map[e?.serverMessage] || e?.serverMessage || 'לא הצלחנו להכין טיוטה. ודאו שה-Gmail מחובר.');
     } finally {
       setDraftPending(false);
     }
+    return ok;
+  };
+
+  // Open the server-side Gmail OAuth popup and poll status until connected,
+  // then auto-retry the draft. Graceful when the server isn't configured.
+  const connectGmail = async () => {
+    setDraftError('');
+    setGmailNotConfigured(false);
+    let url;
+    try {
+      const res = await api.gmailAuthUrl();
+      url = res && res.url;
+    } catch {
+      // Backend can't produce an auth URL → Gmail isn't set up server-side.
+      setGmailNotConfigured(true);
+      return;
+    }
+    if (!url) {
+      setGmailNotConfigured(true);
+      return;
+    }
+    window.open(url, 'gmail', 'width=520,height=640');
+    setConnecting(true);
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      let connected = false;
+      try {
+        const res = await api.gmailStatus();
+        connected = !!(res && res.connected);
+      } catch {
+        connected = false; // keep polling; popup may not be done yet
+      }
+      if (!connected || !mountedRef.current) return;
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+      if (!mountedRef.current) return;
+      setConnecting(false);
+      setShowConnect(false);
+      draftReply(); // nice-to-have: auto-retry now that we're connected
+    }, 3000);
   };
 
   const editingItem = items.find((i) => i.id === editingId) || null;
@@ -488,7 +561,7 @@ export default function DayBuilder() {
               </dl>
               {event.email.message_id && (
                 <a
-                  href={`https://mail.google.com/mail/u/0/#all/${event.email.message_id}`}
+                  href={`https://mail.google.com/mail/?authuser=${encodeURIComponent(brand.gmailAccount)}#all/${event.email.message_id}`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-block mt-2 text-ocar hover:underline"
@@ -506,6 +579,20 @@ export default function DayBuilder() {
               >
                 {draftPending ? 'מכין טיוטה…' : 'השב עם הצעה (ללא מחירים)'}
               </button>
+              {showConnect && !gmailNotConfigured && (
+                <button
+                  onClick={connectGmail}
+                  disabled={connecting}
+                  className="w-full mt-2 border border-ocar text-ocar px-3 py-2 rounded-lg font-medium hover:bg-ocar-soft disabled:opacity-60"
+                >
+                  {connecting ? 'ממתין לחיבור…' : 'התחבר ל-Gmail'}
+                </button>
+              )}
+              {gmailNotConfigured && (
+                <p className="text-slate-500 mt-2 text-xs">
+                  חיבור ה-Gmail בצד השרת עדיין לא מוגדר
+                </p>
+              )}
               {draftLink && (
                 <p className="text-green-600 mt-2">
                   הטיוטה מוכנה.{' '}
