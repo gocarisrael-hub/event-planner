@@ -16,6 +16,7 @@ async function req(method, url, body) {
     const err = new Error(`${method} ${url} → ${res.status}`);
     err.status = res.status;
     err.serverMessage = body && (body.message || body.error);
+    err.serverCode = body && body.error; // machine code (e.g. 'gmail_not_connected')
     throw err;
   }
   return res.status === 204 ? null : res.json();

@@ -389,14 +389,14 @@ export default function DayBuilder() {
       };
       // 409 from the backend when the server-side Gmail isn't ready: either it
       // needs connecting (offer the connect button) or it isn't configured.
-      if (e?.serverMessage === 'gmail_not_connected') {
+      if (e?.serverCode === 'gmail_not_connected') {
         setShowConnect(true);
         setGmailNotConfigured(false);
-      } else if (e?.serverMessage === 'gmail_not_configured') {
+      } else if (e?.serverCode === 'gmail_not_configured') {
         setShowConnect(true);
         setGmailNotConfigured(true);
       }
-      setDraftError(map[e?.serverMessage] || e?.serverMessage || 'לא הצלחנו להכין טיוטה. ודאו שה-Gmail מחובר.');
+      setDraftError(map[e?.serverCode] || e?.serverMessage || 'לא הצלחנו להכין טיוטה. ודאו שה-Gmail מחובר.');
     } finally {
       setDraftPending(false);
     }
