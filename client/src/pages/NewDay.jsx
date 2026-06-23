@@ -6,6 +6,13 @@ import { MONTHS, SEASONS } from '../utils/format.js';
 
 const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-ocar';
 
+// Larger, cleaner controls for the "מתי?" section (date / month / season).
+const whenField =
+  'w-full border border-slate-300 rounded-xl px-4 py-3 text-base bg-white text-slate-800 ' +
+  'transition-colors focus:outline-none focus:border-ocar focus:ring-2 focus:ring-ocar/30 ' +
+  'cursor-pointer [color-scheme:light] [&::-webkit-calendar-picker-indicator]:cursor-pointer ' +
+  '[&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:hover:opacity-100';
+
 export default function NewDay() {
   const navigate = useNavigate();
   const setDirty = useUnsavedStore((s) => s.setDirty);
@@ -102,17 +109,18 @@ export default function NewDay() {
             ))}
           </div>
           {whenMode === 'date' && (
-            <input type="date" className={field} value={form.target_date}
+            <input type="date" className={whenField} value={form.target_date}
+              onClick={(e) => e.currentTarget.showPicker?.()}
               onChange={(e) => set('target_date', e.target.value)} />
           )}
           {whenMode === 'month' && (
-            <select className={field} value={form.target_month} onChange={(e) => set('target_month', e.target.value)}>
+            <select className={whenField} value={form.target_month} onChange={(e) => set('target_month', e.target.value)}>
               <option value="">בחר חודש…</option>
               {MONTHS.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           )}
           {whenMode === 'season' && (
-            <select className={field} value={form.target_season} onChange={(e) => set('target_season', e.target.value)}>
+            <select className={whenField} value={form.target_season} onChange={(e) => set('target_season', e.target.value)}>
               <option value="">בחר עונה…</option>
               {SEASONS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
