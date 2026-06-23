@@ -45,11 +45,13 @@ function TimelineBlock({ item, onDragStart, onClick, dragging, top }) {
   const compact = height < 56;
 
   // Line-clamp the description to a whole number of lines that fit the block.
-  // The fixed header above (title + time line + small gap) takes ~36px, the
-  // block's vertical padding (py-1.5) takes ~12px; the rest is the description
-  // area. Each line of the text-[11px] leading-snug copy is ~14px tall.
-  const LINE_PX = 14;
-  const HEADER_PX = 36;
+  // The fixed header above (title + time line + the mt-0.5 gap) takes ~38px,
+  // the block's vertical padding (py-1.5) takes ~12px; the rest is the
+  // description area. Each line uses an EXACT line-height of LINE_PX (applied
+  // inline below) so the clamped box is always a clean multiple of it and the
+  // block's overflow:hidden never slices through the middle of a line.
+  const LINE_PX = 15;
+  const HEADER_PX = 38;
   const PADDING_PX = 12;
   const descAreaPx = height - HEADER_PX - PADDING_PX;
   const descLines = Math.max(1, Math.floor(descAreaPx / LINE_PX));
@@ -89,12 +91,14 @@ function TimelineBlock({ item, onDragStart, onClick, dragging, top }) {
       {/* Description: clamped to the whole lines that fit, ending with "…". */}
       {!compact && item.description && (
         <div
-          className="flex-1 min-h-0 mt-0.5 text-[11px] text-slate-600 break-words leading-snug"
+          className="min-h-0 mt-0.5 text-[11px] text-slate-600 break-words"
           style={{
             display: '-webkit-box',
             WebkitLineClamp: descLines,
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
+            lineHeight: `${LINE_PX}px`,
+            maxHeight: `${descLines * LINE_PX}px`,
           }}
         >
           {item.description}
