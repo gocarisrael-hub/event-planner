@@ -463,15 +463,13 @@ function draftReply(e) {
     return notify_('יצירת הטיוטה נכשלה: ' + err);
   }
 
+  // Do NOT navigate to a hardcoded /u/0 drafts URL: the account index is
+  // browser-specific and unknowable from the add-on, so it can land on the
+  // wrong account's (empty) Drafts. The draft is already created in the
+  // correct account; just notify the user.
   return CardService.newActionResponseBuilder()
     .setNotification(
-      CardService.newNotification().setText('טיוטה נוצרה עם ההצעה המצורפת')
-    )
-    .setOpenLink(
-      CardService.newOpenLink()
-        .setUrl('https://mail.google.com/mail/u/0/#drafts')
-        .setOpenAs(CardService.OpenAs.FULL_SIZE)
-        .setOnClose(CardService.OnClose.NOTHING)
+      CardService.newNotification().setText('טיוטה עם ההצעה נוצרה בתיבת הטיוטות שלך')
     )
     .build();
 }
