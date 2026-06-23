@@ -72,7 +72,13 @@ function TimelineBlock({ item, onDragStart, onClick, dragging, top }) {
       </div>
       {/* Description: fills the remaining vertical space, clipped to fit */}
       {!compact && item.description && (
-        <div className="flex-1 overflow-hidden min-h-0 mt-0.5 text-[11px] text-slate-600 break-words whitespace-pre-line leading-snug">
+        <div
+          className="flex-1 overflow-hidden min-h-0 mt-0.5 text-[11px] text-slate-600 break-words whitespace-pre-line leading-snug"
+          style={{
+            WebkitMaskImage: 'linear-gradient(to bottom, #000 65%, transparent 100%)',
+            maskImage: 'linear-gradient(to bottom, #000 65%, transparent 100%)',
+          }}
+        >
           {item.description}
         </div>
       )}
