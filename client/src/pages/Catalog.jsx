@@ -17,6 +17,7 @@ export default function Catalog() {
   const [draft, setDraft] = useState(blank);
   const [editing, setEditing] = useState(null); // id
   const [filter, setFilter] = useState(''); // category filter
+  const [locFilter, setLocFilter] = useState(''); // location (מרחב) filter
 
   useEffect(() => { if (!loaded) load(); }, [loaded]);
 
@@ -32,9 +33,17 @@ export default function Catalog() {
     setDraft(blank);
   };
 
+  const locations = useMemo(
+    () => [...new Set(catalog.map((c) => c.location).filter((l) => l && l.trim()))].sort((a, b) => a.localeCompare(b)),
+    [catalog]
+  );
+
   const shown = useMemo(
-    () => (filter ? catalog.filter((c) => c.category === filter) : catalog),
-    [catalog, filter]
+    () =>
+      catalog.filter(
+        (c) => (!filter || c.category === filter) && (!locFilter || c.location === locFilter)
+      ),
+    [catalog, filter, locFilter]
   );
 
   return (
@@ -87,6 +96,23 @@ export default function Catalog() {
           </button>
         ))}
       </div>
+
+      {/* Filter by location (מרחב) */}
+      {locations.length > 0 && (
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <span className="text-sm text-slate-500">מרחב:</span>
+          <button onClick={() => setLocFilter('')}
+            className={`px-3 py-1 rounded-full text-sm ${locFilter === '' ? 'bg-ocar text-white' : 'bg-white border border-slate-200'}`}>
+            הכל
+          </button>
+          {locations.map((loc) => (
+            <button key={loc} onClick={() => setLocFilter(loc)}
+              className={`px-3 py-1 rounded-full text-sm ${locFilter === loc ? 'bg-ocar text-white' : 'bg-white border border-slate-200'}`}>
+              {loc}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* List */}
       <div className="grid gap-3 sm:grid-cols-2">
