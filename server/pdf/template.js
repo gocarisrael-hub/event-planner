@@ -2,6 +2,36 @@
 // Self-contained: RTL, lang=he, embedded CSS, Heebo via Google Fonts.
 // When { prices:false } no prices/totals are rendered (reply PDF is always
 // prices=false).
+import { readFileSync } from 'node:fs';
+import { basename, dirname, extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+// Resolve uploads the same way server/routes/uploads.js does so a stored photo
+// path like "/uploads/<file>" maps to "<UPLOADS_DIR>/<basename>".
+const UPLOAD_DIR = process.env.UPLOADS_DIR || join(__dirname, '..', 'uploads');
+
+const MIME_BY_EXT = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+};
+
+// Read a stored photo path off disk and return a base64 data URI, or '' if the
+// file is missing/unreadable. Puppeteer's setContent has no base URL, so
+// relative "/uploads/..." paths never load — embedding the bytes is robust.
+function dataUri(src) {
+  if (!src) return '';
+  const mime = MIME_BY_EXT[extname(src).toLowerCase()];
+  if (!mime) return '';
+  try {
+    const buf = readFileSync(join(UPLOAD_DIR, basename(src)));
+    return `data:${mime};base64,${buf.toString('base64')}`;
+  } catch {
+    return '';
+  }
+}
 
 const BRAND = {
   name: 'Ocar',
@@ -111,12 +141,13 @@ function esc(s) {
     .replace(/'/g, '&#39;');
 }
 
-// Photo paths may be relative ("/uploads/x.jpg"); leave them as-is. Puppeteer
-// renders before the server is necessarily reachable, so relative paths simply
-// won't resolve — that's acceptable (text content is what matters for the PDF).
+// Photo paths are stored as "/uploads/x.jpg". Puppeteer's setContent has no
+// base URL, so we embed each photo as a base64 data URI read from disk. If the
+// file is missing/unreadable, omit the <img> entirely (no crash, no blank box).
 function img(src, cls) {
-  if (!src) return '';
-  return `<img class="${cls}" src="${esc(src)}" alt="" />`;
+  const uri = dataUri(src);
+  if (!uri) return '';
+  return `<img class="${cls}" src="${uri}" alt="" />`;
 }
 
 export function proposalHtml(event, { prices } = { prices: false }) {
@@ -139,9 +170,19 @@ export function proposalHtml(event, { prices } = { prices: false }) {
       ? img(it.photos[0], 'item-photo')
       : '';
 
-    const mainPrice = showPrices && !hasOptions && formatPrice(it.price)
-      ? `<div class="item-price">${esc(formatPrice(it.price))}</div>`
-      : '';
+    // Choice-block items have a price RANGE (cheapest–priciest option), mirroring
+    // the client `total`/`formatRange`. Plain items show their single price.
+    let slotPrice = '';
+    if (showPrices) {
+      if (hasOptions) {
+        const ps = it.options.map((o) => Number(o.price) || 0);
+        const lo = Math.min(...ps);
+        const hi = Math.max(...ps);
+        slotPrice = `<div class="item-price">${esc(formatRange(lo, hi))}</div>`;
+      } else if (formatPrice(it.price)) {
+        slotPrice = `<div class="item-price">${esc(formatPrice(it.price))}</div>`;
+      }
+    }
 
     let optionsHtml = '';
     if (hasOptions) {
@@ -183,7 +224,7 @@ export function proposalHtml(event, { prices } = { prices: false }) {
             <div class="item-title">${esc(it.title)}</div>
             ${it.description ? `<div class="item-desc">${esc(it.description)}</div>` : ''}
           </div>
-          ${mainPrice}
+          ${slotPrice}
         </div>
         ${optionsHtml}
       </div>`;

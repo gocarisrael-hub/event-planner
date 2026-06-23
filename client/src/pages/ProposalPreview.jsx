@@ -101,6 +101,11 @@ export default function ProposalPreview() {
                 {showPrices && !it.options?.length && formatPrice(it.price) && (
                   <div className="text-sm font-medium whitespace-nowrap">{formatPrice(it.price)}</div>
                 )}
+                {showPrices && it.options?.length > 0 && (() => {
+                  // Choice-block slot price is a range (cheapest–priciest option).
+                  const { low: lo, high: hi } = total([it]);
+                  return <div className="text-sm font-medium whitespace-nowrap">{formatRange(lo, hi)}</div>;
+                })()}
               </div>
 
               {it.options?.length > 0 && (
