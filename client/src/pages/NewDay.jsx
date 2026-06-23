@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useUnsavedStore } from '../store/useUnsavedStore.js';
 import { MONTHS, SEASONS } from '../utils/format.js';
+import DatePicker from '../components/DatePicker.jsx';
 
 const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-ocar';
 
@@ -109,9 +110,7 @@ export default function NewDay() {
             ))}
           </div>
           {whenMode === 'date' && (
-            <input type="date" className={whenField} value={form.target_date}
-              onClick={(e) => e.currentTarget.showPicker?.()}
-              onChange={(e) => set('target_date', e.target.value)} />
+            <DatePicker value={form.target_date} onChange={(v) => set('target_date', v)} />
           )}
           {whenMode === 'month' && (
             <select className={whenField} value={form.target_month} onChange={(e) => set('target_month', e.target.value)}>
