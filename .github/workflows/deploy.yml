@@ -11,13 +11,16 @@ on:
         default: ''
 
 concurrency:
+  # A new deploy cancels a stuck/in-progress one instead of queueing behind it.
   group: deploy-production
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
     if: ${{ github.event.inputs.confirm == 'deploy' }}
     runs-on: ubuntu-latest
+    # Don't let railway up hang forever (it can stall if Railway skips/dedupes).
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
