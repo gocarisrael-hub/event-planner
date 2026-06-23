@@ -13,6 +13,18 @@ export default function ProposalPreview() {
 
   useEffect(() => { api.getEvent(id).then(setEvent); }, [id]);
 
+  // Build a filesystem-safe PDF filename from the event title, distinguishing
+  // the with/without-prices variants. The a.download attribute below is what
+  // actually names the saved blob.
+  const pdfFilename = (withPrices) => {
+    const base = String(event?.title ?? '')
+      .replace(/[/\\:*?"<>|\x00-\x1f]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!base) return withPrices ? 'הצעה.pdf' : 'הצעה (ללא מחירים).pdf';
+    return withPrices ? `הצעה – ${base}.pdf` : `הצעה – ${base} (ללא מחירים).pdf`;
+  };
+
   // Download the server-rendered PDF (clean A4 Hebrew) instead of printing.
   const downloadPdf = async (withPrices) => {
     setError('');
@@ -24,7 +36,7 @@ export default function ProposalPreview() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'הצעה.pdf';
+      a.download = pdfFilename(withPrices);
       document.body.appendChild(a);
       a.click();
       a.remove();

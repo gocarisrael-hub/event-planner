@@ -63,9 +63,19 @@ router.get('/:id/proposal.pdf', async (req, res) => {
       .json({ error: 'pdf_unavailable', message: String(err.message || err) });
   }
 
-  // UTF-8 filename* carries the event title; the plain ASCII filename is a
-  // safe fallback for clients that don't support RFC 5987.
-  const utf8Name = encodeURIComponent(`${event.title || 'הצעה'}.pdf`);
+  // Build a filesystem-safe name from the event title, distinguishing the
+  // with/without-prices variants — mirrors the client's a.download scheme.
+  // UTF-8 filename* carries the real (Hebrew) name; the plain ASCII filename
+  // is a safe fallback for clients that don't support RFC 5987.
+  const base = String(event.title || '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[/\\:*?"<>|\x00-\x1f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  let name;
+  if (!base) name = prices ? 'הצעה.pdf' : 'הצעה (ללא מחירים).pdf';
+  else name = prices ? `הצעה – ${base}.pdf` : `הצעה – ${base} (ללא מחירים).pdf`;
+  const utf8Name = encodeURIComponent(name);
   res.set('Content-Type', 'application/pdf');
   res.set(
     'Content-Disposition',
