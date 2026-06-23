@@ -3,10 +3,11 @@ import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client.js';
 import AddActivityRow from '../components/AddActivityRow.jsx';
 import BudgetMeter from '../components/BudgetMeter.jsx';
+import DatePicker from '../components/DatePicker.jsx';
 import TimelineItem from '../components/TimelineItem.jsx';
 import { useCatalogStore } from '../store/useCatalogStore.js';
 import { useEventStore } from '../store/useEventStore.js';
-import { formatPrice, formatRange, timingLabel, whenLabel } from '../utils/format.js';
+import { formatPrice, formatRange, MONTHS, SEASONS, timingLabel, whenLabel } from '../utils/format.js';
 import {
   DAY_START_MIN,
   DAY_END_MIN,
@@ -23,9 +24,14 @@ import {
 
 const DEFAULT_DURATION = 1; // hours, for items added without one
 
-// Per-head price range contributed by a single choice block.
-function optionRange(options) {
-  const prices = options.map((o) => Number(o.price) || 0);
+// Per-head price range contributed by a choice block: spans the item's OWN
+// price and every option price (blanks/zero ignored). Falls back gracefully
+// when nothing positive is present.
+function choiceRange(item, options) {
+  const prices = [Number(item.price) || 0, ...options.map((o) => Number(o.price) || 0)].filter(
+    (p) => p > 0,
+  );
+  if (prices.length === 0) return { low: 0, high: 0 };
   return { low: Math.min(...prices), high: Math.max(...prices) };
 }
 
@@ -35,8 +41,18 @@ function TimelineBlock({ item, onDragStart, onClick, dragging, top }) {
   const options = item.options || [];
   const hasOptions = options.length > 0;
   const height = durationToHeight(item.approx_duration_hours);
-  const range = hasOptions ? optionRange(options) : null;
+  const range = hasOptions ? choiceRange(item, options) : null;
   const compact = height < 56;
+
+  // Line-clamp the description to a whole number of lines that fit the block.
+  // The fixed header above (title + time line + small gap) takes ~36px, the
+  // block's vertical padding (py-1.5) takes ~12px; the rest is the description
+  // area. Each line of the text-[11px] leading-snug copy is ~14px tall.
+  const LINE_PX = 14;
+  const HEADER_PX = 36;
+  const PADDING_PX = 12;
+  const descAreaPx = height - HEADER_PX - PADDING_PX;
+  const descLines = Math.max(1, Math.floor(descAreaPx / LINE_PX));
 
   return (
     <div
@@ -70,13 +86,15 @@ function TimelineBlock({ item, onDragStart, onClick, dragging, top }) {
           {hasOptions ? formatRange(range.low, range.high) : formatPrice(item.price) || ''}
         </div>
       </div>
-      {/* Description: fills the remaining vertical space, clipped to fit */}
+      {/* Description: clamped to the whole lines that fit, ending with "…". */}
       {!compact && item.description && (
         <div
-          className="flex-1 overflow-hidden min-h-0 mt-0.5 text-[11px] text-slate-600 break-words whitespace-pre-line leading-snug"
+          className="flex-1 min-h-0 mt-0.5 text-[11px] text-slate-600 break-words leading-snug"
           style={{
-            WebkitMaskImage: 'linear-gradient(to bottom, #000 65%, transparent 100%)',
-            maskImage: 'linear-gradient(to bottom, #000 65%, transparent 100%)',
+            display: '-webkit-box',
+            WebkitLineClamp: descLines,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
           }}
         >
           {item.description}
@@ -86,9 +104,130 @@ function TimelineBlock({ item, onDragStart, onClick, dragging, top }) {
   );
 }
 
+const field =
+  'w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-ocar';
+
+// Inline editor for the day's intake details. Mirrors NewDay's fields and the
+// "מתי?" date/month/season toggle; saves via updateEvent and then closes.
+function DayDetailsEditor({ event, onSave, onClose }) {
+  const initialMode = event.target_month ? 'month' : event.target_season ? 'season' : 'date';
+  const [whenMode, setWhenMode] = useState(initialMode);
+  const [form, setForm] = useState({
+    title: event.title || '',
+    client_name: event.client_name || '',
+    group_size: event.group_size ?? '',
+    audience: event.audience || '',
+    requests: event.requests || '',
+    budget: event.budget ?? '',
+    target_date: event.target_date || '',
+    target_month: event.target_month || '',
+    target_season: event.target_season || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await onSave({
+        title: form.title || `יום עבור ${form.client_name || 'לקוח'}`,
+        client_name: form.client_name,
+        group_size: form.group_size ? Number(form.group_size) : null,
+        audience: form.audience,
+        requests: form.requests,
+        budget: form.budget ? Number(form.budget) : null,
+        target_date: whenMode === 'date' ? form.target_date || null : null,
+        target_month: whenMode === 'month' ? form.target_month || null : null,
+        target_season: whenMode === 'season' ? form.target_season || null : null,
+      });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={save} className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 mb-5">
+      <div className="grid sm:grid-cols-2 gap-4">
+        <label className="block">
+          <span className="text-sm font-medium">שם היום / כותרת</span>
+          <input className={field} value={form.title} onChange={(e) => set('title', e.target.value)}
+            placeholder="יום גיבוש לחברת…" />
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium">לקוח</span>
+          <input className={field} value={form.client_name} onChange={(e) => set('client_name', e.target.value)}
+            placeholder="שם החברה / היחידה" />
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium">גודל הקבוצה</span>
+          <input type="number" className={field} value={form.group_size}
+            onChange={(e) => set('group_size', e.target.value)} placeholder="למשל 40" />
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium">תקציב לראש (₪)</span>
+          <input type="number" className={field} value={form.budget}
+            onChange={(e) => set('budget', e.target.value)} placeholder="כמה לאדם" />
+        </label>
+      </div>
+
+      <label className="block">
+        <span className="text-sm font-medium">מי הם?</span>
+        <input className={field} value={form.audience} onChange={(e) => set('audience', e.target.value)}
+          placeholder="צוות פיתוח / יחידה צבאית / הנהלה…" />
+      </label>
+
+      <label className="block">
+        <span className="text-sm font-medium">מה הם רוצים? (כמה משפטים)</span>
+        <textarea className={field} rows={3} value={form.requests}
+          onChange={(e) => set('requests', e.target.value)}
+          placeholder="אווירה, סוג הפעילויות, אוכל, דגשים…" />
+      </label>
+
+      <div>
+        <span className="text-sm font-medium">מתי?</span>
+        <div className="flex gap-2 mt-1 mb-2">
+          {[['date', 'תאריך'], ['month', 'חודש'], ['season', 'עונה']].map(([m, label]) => (
+            <button type="button" key={m} onClick={() => setWhenMode(m)}
+              className={`px-3 py-1 rounded-lg text-sm ${whenMode === m ? 'bg-ocar text-white' : 'bg-slate-100'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {whenMode === 'date' && (
+          <DatePicker value={form.target_date} onChange={(v) => set('target_date', v)} />
+        )}
+        {whenMode === 'month' && (
+          <select className={field} value={form.target_month} onChange={(e) => set('target_month', e.target.value)}>
+            <option value="">בחר חודש…</option>
+            {MONTHS.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        )}
+        {whenMode === 'season' && (
+          <select className={field} value={form.target_season} onChange={(e) => set('target_season', e.target.value)}>
+            <option value="">בחר עונה…</option>
+            {SEASONS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        )}
+      </div>
+
+      <div className="flex gap-2 pt-1">
+        <button type="submit" disabled={saving}
+          className="bg-ocar text-white px-5 py-2 rounded-lg font-medium hover:opacity-90 disabled:opacity-60">
+          {saving ? 'שומר…' : 'שמור שינויים'}
+        </button>
+        <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg text-slate-500">
+          ביטול
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export default function DayBuilder() {
   const { id } = useParams();
-  const { event, items, loading, load, addItem, updateItem, removeItem } = useEventStore();
+  const { event, items, loading, load, addItem, updateItem, removeItem, updateEvent } = useEventStore();
   const loadCatalog = useCatalogStore((s) => s.load);
   const refreshCatalog = useCatalogStore((s) => s.refresh);
 
@@ -96,6 +235,7 @@ export default function DayBuilder() {
   const [draftLink, setDraftLink] = useState('');
   const [draftError, setDraftError] = useState('');
   const [editingId, setEditingId] = useState(null);
+  const [editDay, setEditDay] = useState(false);
 
   // Transient drag state: which item, its live top (px), and whether a real
   // drag happened (to suppress the click-to-edit on release).
@@ -229,14 +369,29 @@ export default function DayBuilder() {
     <div className="grid lg:grid-cols-[1fr_280px] gap-6 items-start">
       <div>
         <Link to="/" className="text-sm text-slate-400 hover:text-ocar">← הימים שלי</Link>
-        <div className="flex items-start justify-between mt-1 mb-1">
+        <div className="flex items-start justify-between gap-3 mt-1 mb-1">
           <h1 className="text-2xl font-bold">{event.title}</h1>
+          <button
+            type="button"
+            onClick={() => setEditDay((v) => !v)}
+            className="flex-shrink-0 text-sm border border-slate-300 rounded-lg px-3 py-1.5 text-slate-600 hover:border-ocar hover:text-ocar"
+          >
+            {editDay ? 'סגור עריכה' : 'ערוך פרטי יום'}
+          </button>
         </div>
         <p className="text-slate-500 mb-5 text-sm">
           {[event.client_name, event.group_size && `${event.group_size} משתתפים`, whenLabel(event)]
             .filter(Boolean)
             .join(' · ')}
         </p>
+
+        {editDay && (
+          <DayDetailsEditor
+            event={event}
+            onSave={updateEvent}
+            onClose={() => setEditDay(false)}
+          />
+        )}
 
         <div className="mb-4">
           <AddActivityRow onAdd={onAdd} />
