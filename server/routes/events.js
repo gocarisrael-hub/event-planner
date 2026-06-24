@@ -1,12 +1,28 @@
 // Events (days) + their schedule items.
 import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, unlink } from 'node:fs';
+import { dirname, extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Router } from 'express';
+import multer from 'multer';
 import { catalog, events, items } from '../db.js';
 import { generateProposalPdf } from '../pdf/generate.js';
 
 const router = Router();
 
 const now = () => new Date().toISOString();
+
+// Private day-file attachments → disk (same volume as photos), served at
+// /uploads. Accepts ANY file type (no image filter), capped at 25MB.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const UPLOAD_DIR = process.env.UPLOADS_DIR || join(__dirname, '..', 'uploads');
+if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const fileStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+  filename: (_req, file, cb) => cb(null, `${randomUUID()}${extname(file.originalname)}`),
+});
+const fileUpload = multer({ storage: fileStorage, limits: { fileSize: 25 * 1024 * 1024 } });
 
 function withItems(event) {
   const list = items
@@ -35,6 +51,8 @@ router.post('/', (req, res) => {
     status: 'draft',
     cover_photo: null,
     email: null,
+    notes: b.notes || '',
+    files: [],
     created_at: now(),
     updated_at: now(),
   });
@@ -94,6 +112,37 @@ router.delete('/:id', (req, res) => {
   items.where((i) => i.event_id === req.params.id).forEach((i) => items.remove(i.id));
   const ok = events.remove(req.params.id);
   res.json({ ok });
+});
+
+// --- Files (private day attachments) -------------------------------------
+router.post('/:id/files', fileUpload.single('file'), (req, res) => {
+  const event = events.find(req.params.id);
+  if (!event) return res.status(404).json({ error: 'not found' });
+  if (!req.file) return res.status(400).json({ error: 'no file uploaded' });
+  const file = {
+    id: randomUUID(),
+    name: req.file.originalname,
+    type: req.file.mimetype,
+    size: req.file.size,
+    url: `/uploads/${req.file.filename}`,
+    uploaded_at: new Date().toISOString(),
+  };
+  const files = [...(event.files || []), file];
+  events.update(event.id, { files });
+  res.status(201).json(file);
+});
+
+router.delete('/:id/files/:fileId', (req, res) => {
+  const event = events.find(req.params.id);
+  if (!event) return res.status(404).json({ error: 'not found' });
+  const file = (event.files || []).find((f) => f.id === req.params.fileId);
+  const files = (event.files || []).filter((f) => f.id !== req.params.fileId);
+  events.update(event.id, { files });
+  // Best-effort disk cleanup; ignore errors (e.g. already gone).
+  if (file && file.url) {
+    unlink(join(UPLOAD_DIR, file.url.replace(/^\/uploads\//, '')), () => {});
+  }
+  res.json({ ok: true });
 });
 
 // --- Items (schedule blocks) ---------------------------------------------

@@ -25,6 +25,28 @@ import {
 
 const DEFAULT_DURATION = 1; // hours, for items added without one
 
+// Pick a type icon for a private day-file from its extension or mime type.
+function fileIcon(file) {
+  const ext = (file.name || '').split('.').pop()?.toLowerCase() || '';
+  const mime = file.type || '';
+  if (ext === 'pdf' || mime === 'application/pdf') return '📄';
+  if (['doc', 'docx'].includes(ext) || mime.includes('word')) return '📝';
+  if (['xls', 'xlsx', 'csv'].includes(ext) || mime.includes('sheet') || mime.includes('excel'))
+    return '📊';
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext) || mime.startsWith('image/'))
+    return '🖼️';
+  if (['zip', 'rar', '7z'].includes(ext) || mime.includes('zip')) return '🗜️';
+  return '📎';
+}
+
+// Human-friendly file size (KB / MB).
+function fileSize(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 // Per-head price range contributed by a choice block: spans the item's OWN
 // price and every option price (blanks/zero ignored). Falls back gracefully
 // when nothing positive is present.
@@ -235,7 +257,8 @@ function DayDetailsEditor({ event, onSave, onClose }) {
 
 export default function DayBuilder() {
   const { id } = useParams();
-  const { event, items, loading, load, addItem, updateItem, removeItem, updateEvent } = useEventStore();
+  const { event, items, loading, load, addItem, updateItem, removeItem, updateEvent, addFile, removeFile } =
+    useEventStore();
   const loadCatalog = useCatalogStore((s) => s.load);
   const refreshCatalog = useCatalogStore((s) => s.refresh);
 
@@ -244,6 +267,16 @@ export default function DayBuilder() {
   const [draftError, setDraftError] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editDay, setEditDay] = useState(false);
+
+  // Private notes (auto-saved, debounced). Local state mirrors event.notes and
+  // is re-initialised whenever we switch to a different day.
+  const [notes, setNotes] = useState('');
+  const [notesStatus, setNotesStatus] = useState(''); // '', 'saving', 'saved'
+  const notesTimer = useRef(null);
+
+  // Private file uploads (any type). Track an "uploading" flag for UI.
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Gmail connect flow (lazily shown when a reply fails because the SERVER
   // isn't connected). Mirrors the old Inbox page's connect/poll pattern.
@@ -264,6 +297,53 @@ export default function DayBuilder() {
   const seeded = useRef(false);
   useEffect(() => { seeded.current = false; load(id); }, [id]);
   useEffect(() => { loadCatalog(); }, []);
+
+  // Re-init local notes whenever we switch days (event.id change). Clear any
+  // pending debounce so the previous day's edit can't bleed into the new one.
+  useEffect(() => {
+    setNotes(event?.notes || '');
+    setNotesStatus('');
+    if (notesTimer.current) {
+      clearTimeout(notesTimer.current);
+      notesTimer.current = null;
+    }
+  }, [event?.id]);
+
+  // Flush the debounce timer on unmount (no leaks / late saves).
+  useEffect(() => () => {
+    if (notesTimer.current) clearTimeout(notesTimer.current);
+  }, []);
+
+  // Update local notes immediately; debounce the persisted updateEvent.
+  const onNotesChange = (value) => {
+    setNotes(value);
+    setNotesStatus('saving');
+    if (notesTimer.current) clearTimeout(notesTimer.current);
+    notesTimer.current = setTimeout(async () => {
+      await updateEvent({ notes: value });
+      setNotesStatus('saved');
+    }, 600);
+  };
+
+  // Upload each chosen file (any type) via the store; show an "uploading" hint.
+  const onPickFiles = async (e) => {
+    const chosen = Array.from(e.target.files || []);
+    if (chosen.length === 0) return;
+    setUploading(true);
+    try {
+      for (const f of chosen) {
+        await addFile(event.id, f);
+      }
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const onDeleteFile = async (file) => {
+    if (!window.confirm(`למחוק את "${file.name}"?`)) return;
+    await removeFile(event.id, file.id);
+  };
 
   // Stop any Gmail status poll and block setState on unmount (no leaks).
   useEffect(() => {
@@ -525,6 +605,89 @@ export default function DayBuilder() {
         >
           תצוגת הצעה ל-PDF →
         </Link>
+        {/* Private notes — never shown in the client proposal/PDF. */}
+        <div className="bg-white rounded-xl border border-slate-200 p-4 text-sm">
+          <div className="flex items-baseline justify-between gap-2">
+            <div>
+              <div className="font-medium">הערות</div>
+              <div className="text-xs text-slate-400">רק לך — לא מופיע בהצעה</div>
+            </div>
+            {notesStatus && (
+              <span className="text-xs text-slate-400">
+                {notesStatus === 'saving' ? 'נשמר…' : 'נשמר אוטומטית'}
+              </span>
+            )}
+          </div>
+          <textarea
+            dir="rtl"
+            rows={5}
+            value={notes}
+            onChange={(e) => onNotesChange(e.target.value)}
+            placeholder="תזכורות, דגשים פנימיים…"
+            className={`${field} mt-2 resize-y`}
+          />
+        </div>
+
+        {/* Private file attachments — internal docs, never in the proposal. */}
+        <div className="bg-white rounded-xl border border-slate-200 p-4 text-sm">
+          <div className="flex items-baseline justify-between gap-2 mb-2">
+            <div>
+              <div className="font-medium">קבצים</div>
+              <div className="text-xs text-slate-400">מסמכים פנימיים — חוזה, קבלה וכו'</div>
+            </div>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={onPickFiles}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="w-full border border-ocar text-ocar px-3 py-2 rounded-lg font-medium hover:bg-ocar-soft disabled:opacity-60"
+          >
+            {uploading ? 'מעלה…' : '+ העלה קובץ'}
+          </button>
+
+          {(event.files || []).length === 0 ? (
+            <p className="text-slate-400 mt-3">אין קבצים עדיין</p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {(event.files || []).map((file) => (
+                <li
+                  key={file.id}
+                  className="flex items-center gap-2 border border-slate-100 rounded-lg px-2 py-1.5"
+                >
+                  <span className="flex-shrink-0">{fileIcon(file)}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate" title={file.name}>{file.name}</div>
+                    <div className="text-xs text-slate-400">{fileSize(file.size)}</div>
+                  </div>
+                  <a
+                    href={file.url}
+                    download={file.name}
+                    className="flex-shrink-0 text-ocar hover:underline"
+                    title="הורד"
+                  >
+                    ⬇
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteFile(file)}
+                    className="flex-shrink-0 text-slate-400 hover:text-red-600"
+                    title="מחק"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         {event.requests && (
           <div className="bg-white rounded-xl border border-slate-200 p-4 text-sm">
             <div className="font-medium mb-1">מה הם רצו</div>

@@ -77,6 +77,14 @@ function migrate(d) {
       ev.email = null;
       changed = true;
     }
+    if (!('notes' in ev)) {
+      ev.notes = '';
+      changed = true;
+    }
+    if (!Array.isArray(ev.files)) {
+      ev.files = [];
+      changed = true;
+    }
   }
   for (const it of d.items || []) {
     if (!Array.isArray(it.options)) {

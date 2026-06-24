@@ -61,6 +61,17 @@ export const api = {
   gmailCreateDay: (messageId) => req('POST', '/api/gmail/create-day', { message_id: messageId }),
   gmailDraftReply: (eventId) => req('POST', '/api/gmail/draft-reply', { event_id: eventId }),
 
+  // day files (private attachments)
+  addDayFile: async (eventId, file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(`/api/events/${eventId}/files`, { method: 'POST', body: fd });
+    if (!res.ok) throw new Error('upload failed');
+    return res.json(); // file object
+  },
+  deleteDayFile: (eventId, fileId) =>
+    req('DELETE', `/api/events/${eventId}/files/${fileId}`),
+
   // uploads
   uploadPhoto: async (file) => {
     const fd = new FormData();
