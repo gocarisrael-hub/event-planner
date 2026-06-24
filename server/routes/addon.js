@@ -39,6 +39,7 @@ router.post('/create-day', (req, res) => {
     subject: b.subject || '',
     date: b.date || '',
     snippet: b.snippet || '',
+    body: b.body || '',
   };
   const title = b.subject || `יום עבור ${b.from || ''}`.trim();
   const event = events.insert({
@@ -103,6 +104,7 @@ router.post('/link-day', (req, res) => {
     subject: b.subject || '',
     date: b.date || '',
     snippet: b.snippet || '',
+    body: b.body || '',
   };
   events.update(event.id, { email, updated_at: now() });
   const base = process.env.APP_BASE_URL || '';

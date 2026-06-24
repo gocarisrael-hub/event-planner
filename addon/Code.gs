@@ -252,7 +252,7 @@ function createDay(e) {
     subject: message.getSubject() || '',
     date: message.getDate() ? message.getDate().toISOString() : '',
     snippet: (message.getPlainBody() || '').slice(0, 300),
-    body: message.getPlainBody() || ''
+    body: (message.getPlainBody() || '').slice(0, 10000)
   };
 
   var resp;
@@ -348,7 +348,8 @@ function linkDay(e) {
     from: message.getFrom() || '',
     subject: message.getSubject() || '',
     date: message.getDate() ? message.getDate().toISOString() : '',
-    snippet: (message.getPlainBody() || '').slice(0, 300)
+    snippet: (message.getPlainBody() || '').slice(0, 300),
+    body: (message.getPlainBody() || '').slice(0, 10000)
   };
 
   var resp;
