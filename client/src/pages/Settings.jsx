@@ -153,7 +153,6 @@ export default function Settings() {
       <h1 className="text-2xl font-bold mb-8">הגדרות</h1>
 
       <section className="mb-12">
-        <h2 className="text-xl font-bold mb-4">קטגוריות</h2>
         <Categories />
       </section>
 
