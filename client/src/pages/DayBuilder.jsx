@@ -554,6 +554,30 @@ export default function DayBuilder() {
           />
         )}
 
+        {/* Private notes — never shown in the client proposal/PDF. Full-width
+            at the top of the main column for a larger, more comfortable area. */}
+        <div className="bg-white rounded-xl border border-slate-200 p-4 text-sm mb-4">
+          <div className="flex items-baseline justify-between gap-2">
+            <div>
+              <div className="font-medium">הערות</div>
+              <div className="text-xs text-slate-400">רק לך — לא מופיע בהצעה</div>
+            </div>
+            {notesStatus && (
+              <span className="text-xs text-slate-400">
+                {notesStatus === 'saving' ? 'נשמר…' : 'נשמר אוטומטית'}
+              </span>
+            )}
+          </div>
+          <textarea
+            dir="rtl"
+            rows={4}
+            value={notes}
+            onChange={(e) => onNotesChange(e.target.value)}
+            placeholder="תזכורות, דגשים פנימיים…"
+            className={`${field} mt-2 resize-y`}
+          />
+        </div>
+
         <div className="mb-4">
           <AddActivityRow onAdd={onAdd} />
         </div>
@@ -606,29 +630,6 @@ export default function DayBuilder() {
         >
           תצוגת הצעה ל-PDF →
         </Link>
-        {/* Private notes — never shown in the client proposal/PDF. */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 text-sm">
-          <div className="flex items-baseline justify-between gap-2">
-            <div>
-              <div className="font-medium">הערות</div>
-              <div className="text-xs text-slate-400">רק לך — לא מופיע בהצעה</div>
-            </div>
-            {notesStatus && (
-              <span className="text-xs text-slate-400">
-                {notesStatus === 'saving' ? 'נשמר…' : 'נשמר אוטומטית'}
-              </span>
-            )}
-          </div>
-          <textarea
-            dir="rtl"
-            rows={5}
-            value={notes}
-            onChange={(e) => onNotesChange(e.target.value)}
-            placeholder="תזכורות, דגשים פנימיים…"
-            className={`${field} mt-2 resize-y`}
-          />
-        </div>
-
         {/* Private file attachments — internal docs, never in the proposal. */}
         <div className="bg-white rounded-xl border border-slate-200 p-4 text-sm">
           <div className="flex items-baseline justify-between gap-2 mb-2">
