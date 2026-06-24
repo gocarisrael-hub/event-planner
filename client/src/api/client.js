@@ -53,6 +53,12 @@ export const api = {
   createCategory: (name) => req('POST', '/api/categories', { name }),
   deleteCategory: (id) => req('DELETE', `/api/categories/${id}`),
 
+  // statuses (user-editable event statuses)
+  listStatuses: () => req('GET', '/api/statuses'),
+  createStatus: (label, color) => req('POST', '/api/statuses', { label, color }),
+  updateStatus: (id, patch) => req('PUT', `/api/statuses/${id}`, patch),
+  deleteStatus: (id) => req('DELETE', `/api/statuses/${id}`),
+
   // gmail integration
   gmailStatus: () => req('GET', '/api/gmail/status'),
   gmailAuthUrl: () => req('GET', '/api/gmail/auth-url'),

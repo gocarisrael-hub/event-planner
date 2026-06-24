@@ -9,6 +9,7 @@ import DayBuilder from './pages/DayBuilder.jsx';
 import EventsTable from './pages/EventsTable.jsx';
 import NewDay from './pages/NewDay.jsx';
 import ProposalPreview from './pages/ProposalPreview.jsx';
+import Settings from './pages/Settings.jsx';
 import './styles/index.css';
 
 const router = createBrowserRouter([
@@ -21,6 +22,7 @@ const router = createBrowserRouter([
       { path: '/status', element: <EventsTable /> },
       { path: '/catalog', element: <Catalog /> },
       { path: '/categories', element: <Categories /> },
+      { path: '/settings', element: <Settings /> },
     ],
   },
   // Standalone print page (no app chrome).

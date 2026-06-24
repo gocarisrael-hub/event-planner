@@ -10,10 +10,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.DATA_DIR || join(__dirname, 'data');
 const DATA_FILE = join(DATA_DIR, 'app.json');
 
-const EMPTY = { categories: [], catalog: [], events: [], items: [] };
+const EMPTY = { categories: [], catalog: [], events: [], items: [], statuses: [] };
 
-// Valid event statuses (mirror of client/src/utils/status.js STATUSES keys).
-const STATUS_KEYS = ['draft', 'proposal_sent', 'coordinating', 'sealed', 'done', 'cancelled'];
+// Seed statuses — ids EXACTLY equal the legacy status keys so existing events
+// keep matching. Statuses are dynamic / user-editable from here on.
+const DEFAULT_STATUSES = [
+  { id: 'draft', label: 'טיוטה', color: 'slate', order: 0 },
+  { id: 'proposal_sent', label: 'הצעה נשלחה', color: 'sky', order: 1 },
+  { id: 'coordinating', label: 'בתיאום ספקים ומועד', color: 'amber', order: 2 },
+  { id: 'sealed', label: 'נסגר', color: 'emerald', order: 3 },
+  { id: 'done', label: 'בוצע', color: 'violet', order: 4 },
+  { id: 'cancelled', label: 'בוטל', color: 'rose', order: 5 },
+];
 
 const DEFAULT_CATEGORIES = [
   'אוכל',
@@ -58,6 +66,7 @@ function seed() {
     ],
     events: [],
     items: [],
+    statuses: DEFAULT_STATUSES.map((s) => ({ ...s })),
   };
 }
 
@@ -65,6 +74,11 @@ function seed() {
 // Returns true if anything changed.
 function migrate(d) {
   let changed = false;
+  // Seed the statuses collection if absent/empty (existing data files).
+  if (!Array.isArray(d.statuses) || d.statuses.length === 0) {
+    d.statuses = DEFAULT_STATUSES.map((s) => ({ ...s }));
+    changed = true;
+  }
   for (const c of d.catalog || []) {
     if ('default_price_min' in c || 'default_price_max' in c) {
       if (c.default_price === undefined) {
@@ -88,12 +102,9 @@ function migrate(d) {
       ev.files = [];
       changed = true;
     }
-    // Ensure a valid status. Map legacy 'final' → 'sealed'; default 'draft'.
-    if (ev.status === 'final') {
-      ev.status = 'sealed';
-      changed = true;
-    }
-    if (!STATUS_KEYS.includes(ev.status)) {
+    // Statuses are dynamic now — don't normalize into a fixed key set.
+    // Only default a missing/empty status to 'draft'.
+    if (!ev.status) {
       ev.status = 'draft';
       changed = true;
     }
@@ -174,4 +185,5 @@ export const categories = col('categories');
 export const catalog = col('catalog');
 export const events = col('events');
 export const items = col('items');
+export const statuses = col('statuses');
 export { persist };

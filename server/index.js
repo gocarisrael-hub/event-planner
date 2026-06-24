@@ -7,6 +7,7 @@ import addonRouter from './routes/addon.js';
 import catalogRouter, { categoryRouter } from './routes/catalog.js';
 import eventsRouter from './routes/events.js';
 import gmailRouter from './routes/gmail.js';
+import statusesRouter from './routes/statuses.js';
 import uploadsRouter from './routes/uploads.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -27,6 +28,7 @@ app.get('/api/version', (_req, res) => res.json({ version: '2026-06-24-gmail-rep
 app.use('/api/events', eventsRouter);
 app.use('/api/catalog', catalogRouter);
 app.use('/api/categories', categoryRouter);
+app.use('/api/statuses', statusesRouter);
 app.use('/api/uploads', uploadsRouter);
 app.use('/api/gmail', gmailRouter);
 app.use('/api/addon', addonRouter);

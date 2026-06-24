@@ -1,12 +1,21 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { STATUSES, statusBadgeClass, statusDotClass, statusLabel } from '../utils/status.js';
+import { useStatusStore } from '../store/useStatusStore.js';
+import { statusBadgeClass, statusDotClass, statusLabel } from '../utils/status.js';
 
 // A nice-looking status control: a colored pill that opens a clean dropdown
-// menu of every status. The menu is rendered in a portal with fixed
-// positioning so it floats on top and is never clipped by table overflow.
-// Closes on click-outside, Escape, scroll, and resize. RTL.
+// menu of every status. The status list is loaded from the (server-backed)
+// status store. The menu is rendered in a portal with fixed positioning so it
+// floats on top and is never clipped by table overflow. Closes on
+// click-outside, Escape, scroll, and resize. RTL.
 export default function StatusSelect({ value, onChange, disabled = false }) {
+  const statuses = useStatusStore((s) => s.statuses);
+  const loaded = useStatusStore((s) => s.loaded);
+  const load = useStatusStore((s) => s.load);
+  useEffect(() => {
+    if (!loaded) load();
+  }, [loaded, load]);
+
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState(null); // { top, left, width }
   const btnRef = useRef(null);
@@ -75,11 +84,12 @@ export default function StatusSelect({ value, onChange, disabled = false }) {
         aria-expanded={open}
         dir="rtl"
         className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap transition ${statusBadgeClass(
+          statuses,
           value
         )} ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:brightness-95'}`}
       >
-        <span className={`inline-block w-1.5 h-1.5 rounded-full ${statusDotClass(value)}`} />
-        {statusLabel(value)}
+        <span className={`inline-block w-1.5 h-1.5 rounded-full ${statusDotClass(statuses, value)}`} />
+        {statusLabel(statuses, value)}
         <svg
           className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`}
           viewBox="0 0 20 20"
@@ -109,18 +119,18 @@ export default function StatusSelect({ value, onChange, disabled = false }) {
             }}
             className="bg-white rounded-xl shadow-lg border border-slate-200 p-1 z-50"
           >
-            {STATUSES.map((s) => {
-              const active = s.key === value;
+            {statuses.map((s) => {
+              const active = s.id === value;
               return (
-                <li key={s.key}>
+                <li key={s.id}>
                   <button
                     type="button"
                     role="option"
                     aria-selected={active}
-                    onClick={() => select(s.key)}
+                    onClick={() => select(s.id)}
                     className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm text-slate-700 hover:bg-slate-50 text-right"
                   >
-                    <span className={`inline-block w-2 h-2 rounded-full ${s.dotClass}`} />
+                    <span className={`inline-block w-2 h-2 rounded-full ${statusDotClass(statuses, s.id)}`} />
                     <span className="flex-1">{s.label}</span>
                     {active && (
                       <svg className="w-4 h-4 text-ocar" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
