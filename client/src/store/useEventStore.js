@@ -18,6 +18,24 @@ export const useEventStore = create((set, get) => ({
     set({ event: { ...get().event, ...event } });
   },
 
+  // Private day-file attachments (kept on event.files in the store).
+  addFile: async (eventId, file) => {
+    const created = await api.addDayFile(eventId, file);
+    const ev = get().event;
+    if (ev && ev.id === eventId) {
+      set({ event: { ...ev, files: [...(ev.files || []), created] } });
+    }
+    return created;
+  },
+
+  removeFile: async (eventId, fileId) => {
+    await api.deleteDayFile(eventId, fileId);
+    const ev = get().event;
+    if (ev && ev.id === eventId) {
+      set({ event: { ...ev, files: (ev.files || []).filter((f) => f.id !== fileId) } });
+    }
+  },
+
   // Add an item. opts: { from_catalog_id } to pull from catalog,
   // otherwise a fresh activity that is auto-saved to the catalog.
   addItem: async (data) => {
