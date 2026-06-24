@@ -53,6 +53,7 @@ export default function Layout() {
           </button>
           <nav className="flex items-center gap-1 mr-auto">
             <Tab to="/">הימים שלי</Tab>
+            <Tab to="/table">טבלה</Tab>
             <Tab to="/catalog">קטלוג</Tab>
             <Tab to="/categories">קטגוריות</Tab>
           </nav>
