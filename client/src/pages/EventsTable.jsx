@@ -39,7 +39,7 @@ export default function EventsTable() {
 
   return (
     <div dir="rtl">
-      <h1 className="text-2xl font-bold mb-6">טבלת ימים</h1>
+      <h1 className="text-2xl font-bold mb-6">סטטוס ימים</h1>
 
       {!loading && events.length > 0 && (
         <input

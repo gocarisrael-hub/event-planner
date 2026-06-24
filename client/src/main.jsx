@@ -18,7 +18,7 @@ const router = createBrowserRouter([
       { path: '/', element: <Dashboard /> },
       { path: '/new', element: <NewDay /> },
       { path: '/day/:id', element: <DayBuilder /> },
-      { path: '/table', element: <EventsTable /> },
+      { path: '/status', element: <EventsTable /> },
       { path: '/catalog', element: <Catalog /> },
       { path: '/categories', element: <Categories /> },
     ],
