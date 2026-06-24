@@ -12,6 +12,9 @@ const DATA_FILE = join(DATA_DIR, 'app.json');
 
 const EMPTY = { categories: [], catalog: [], events: [], items: [] };
 
+// Valid event statuses (mirror of client/src/utils/status.js STATUSES keys).
+const STATUS_KEYS = ['draft', 'proposal_sent', 'coordinating', 'sealed', 'done', 'cancelled'];
+
 const DEFAULT_CATEGORIES = [
   'אוכל',
   'אטרקציה',
@@ -83,6 +86,15 @@ function migrate(d) {
     }
     if (!Array.isArray(ev.files)) {
       ev.files = [];
+      changed = true;
+    }
+    // Ensure a valid status. Map legacy 'final' → 'sealed'; default 'draft'.
+    if (ev.status === 'final') {
+      ev.status = 'sealed';
+      changed = true;
+    }
+    if (!STATUS_KEYS.includes(ev.status)) {
+      ev.status = 'draft';
       changed = true;
     }
   }
