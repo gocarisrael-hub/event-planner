@@ -267,6 +267,7 @@ export default function DayBuilder() {
   const [draftError, setDraftError] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editDay, setEditDay] = useState(false);
+  const [mailExpanded, setMailExpanded] = useState(false);
 
   // Private notes (auto-saved, debounced). Local state mirrors event.notes and
   // is re-initialised whenever we switch to a different day.
@@ -663,17 +664,17 @@ export default function DayBuilder() {
                 >
                   <span className="flex-shrink-0">{fileIcon(file)}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="truncate" title={file.name}>{file.name}</div>
+                    <a
+                      href={file.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block truncate text-ocar hover:underline"
+                      title={file.name}
+                    >
+                      {file.name}
+                    </a>
                     <div className="text-xs text-slate-400">{fileSize(file.size)}</div>
                   </div>
-                  <a
-                    href={file.url}
-                    download={file.name}
-                    className="flex-shrink-0 text-ocar hover:underline"
-                    title="הורד"
-                  >
-                    ⬇
-                  </a>
                   <button
                     type="button"
                     onClick={() => onDeleteFile(file)}
@@ -722,6 +723,22 @@ export default function DayBuilder() {
                   <p className="text-slate-500 whitespace-pre-wrap pt-1">{event.email.snippet}</p>
                 )}
               </dl>
+              {event.email.body && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setMailExpanded((v) => !v)}
+                    className="text-ocar hover:underline"
+                  >
+                    {mailExpanded ? 'כווץ' : 'הצג את כל המייל'}
+                  </button>
+                  {mailExpanded && (
+                    <div className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-sm text-slate-600 border border-slate-200 rounded-lg bg-slate-50 p-2">
+                      {event.email.body}
+                    </div>
+                  )}
+                </div>
+              )}
               {event.email.message_id && (
                 <a
                   href={`https://mail.google.com/mail/?authuser=${encodeURIComponent(brand.gmailAccount)}#all/${event.email.message_id}`}
