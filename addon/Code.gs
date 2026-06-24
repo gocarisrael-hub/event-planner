@@ -24,6 +24,10 @@
 /* Config                                                              */
 /* ------------------------------------------------------------------ */
 
+// The mailbox to open links in (forces the right Google account under
+// multi-login, instead of the browser's default /u/0).
+var GMAIL_ACCOUNT = 'gocarisrael@gmail.com';
+
 /**
  * Reads BACKEND_URL / ADDON_API_KEY from Script Properties.
  * Returns { ok:true, backendUrl, apiKey } or { ok:false, card } where card
@@ -463,13 +467,18 @@ function draftReply(e) {
     return notify_('יצירת הטיוטה נכשלה: ' + err);
   }
 
-  // Do NOT navigate to a hardcoded /u/0 drafts URL: the account index is
-  // browser-specific and unknowable from the add-on, so it can land on the
-  // wrong account's (empty) Drafts. The draft is already created in the
-  // correct account; just notify the user.
+  // Open the Drafts of the CORRECT account via ?authuser=<email> (not /u/0,
+  // which is browser-specific and can land on the wrong account). The new
+  // draft is at the top. setOpenAs FULL_SIZE makes it open automatically.
   return CardService.newActionResponseBuilder()
     .setNotification(
-      CardService.newNotification().setText('טיוטה עם ההצעה נוצרה בתיבת הטיוטות שלך')
+      CardService.newNotification().setText('טיוטה עם ההצעה נוצרה — נפתחת')
+    )
+    .setOpenLink(
+      CardService.newOpenLink()
+        .setUrl('https://mail.google.com/mail/?authuser=' + GMAIL_ACCOUNT + '#drafts')
+        .setOpenAs(CardService.OpenAs.FULL_SIZE)
+        .setOnClose(CardService.OnClose.NOTHING)
     )
     .build();
 }
