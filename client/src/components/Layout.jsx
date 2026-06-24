@@ -55,7 +55,7 @@ export default function Layout() {
             <Tab to="/">הימים שלי</Tab>
             <Tab to="/status">סטטוס</Tab>
             <Tab to="/catalog">קטלוג</Tab>
-            <Tab to="/categories">קטגוריות</Tab>
+            <Tab to="/settings">הגדרות</Tab>
           </nav>
         </div>
       </header>

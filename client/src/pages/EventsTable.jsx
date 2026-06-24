@@ -4,11 +4,20 @@ import { api } from '../api/client.js';
 import { brand } from '../brand/brand.js';
 import { whenLabel } from '../utils/format.js';
 import StatusSelect from '../components/StatusSelect.jsx';
+import { useStatusStore } from '../store/useStatusStore.js';
 
 export default function EventsTable() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
+
+  // Ensure dynamic statuses are loaded so the pills resolve labels/colors.
+  const statusesLoaded = useStatusStore((s) => s.loaded);
+  const loadStatuses = useStatusStore((s) => s.load);
+
+  useEffect(() => {
+    if (!statusesLoaded) loadStatuses();
+  }, [statusesLoaded, loadStatuses]);
 
   useEffect(() => {
     api.listEvents().then((e) => {
