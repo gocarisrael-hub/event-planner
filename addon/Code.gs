@@ -28,6 +28,10 @@
 // multi-login, instead of the browser's default /u/0).
 var GMAIL_ACCOUNT = 'gocarisrael@gmail.com';
 
+// Gmail label applied to threads that already have a fun day, so they are
+// visible as such directly in the inbox list.
+var DAY_LABEL = 'יום ב-Ocar ✅';
+
 /**
  * Reads BACKEND_URL / ADDON_API_KEY from Script Properties.
  * Returns { ok:true, backendUrl, apiKey } or { ok:false, card } where card
@@ -146,6 +150,43 @@ function onGmailMessage(e) {
     return conf.card;
   }
 
+  // If a day already exists for this thread, show a prominent banner at the
+  // top (above the info section) and make sure the thread carries the label.
+  var existingDay = fetchEventByThread_(conf, threadId);
+  if (existingDay && existingDay.exists) {
+    tagThreadAsDay_(message);
+
+    var bannerText = '<b><font color="#188038">✓ כבר קיים יום לפנייה הזו</font></b>';
+    if (existingDay.title) {
+      bannerText += '<br>' + escapeHtml_(existingDay.title);
+    }
+    var banner = CardService.newCardSection().addWidget(
+      CardService.newDecoratedText()
+        .setText(bannerText)
+        .setWrapText(true)
+    );
+    banner.addWidget(
+      CardService.newTextButton()
+        .setText('פתח את היום')
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setOpenLink(
+          CardService.newOpenLink()
+            .setUrl(dayUrl_(conf, existingDay.id))
+            .setOpenAs(CardService.OpenAs.FULL_SIZE)
+            .setOnClose(CardService.OnClose.NOTHING)
+        )
+    );
+    // Insert the banner as the first section, before the info section.
+    var bannerBuilder = CardService.newCardBuilder().setHeader(
+      CardService.newCardHeader()
+        .setTitle('Ocar Fun Day')
+        .setSubtitle('יצירת יום כיף מתוך פניית לקוח')
+    );
+    bannerBuilder.addSection(banner);
+    bannerBuilder.addSection(info);
+    builder = bannerBuilder;
+  }
+
   var actions = CardService.newCardSection();
 
   var createBtn = CardService.newTextButton()
@@ -210,6 +251,36 @@ function onGmailMessage(e) {
   }
 
   return builder.build();
+}
+
+/**
+ * Asks the backend whether a day already exists for this Gmail thread.
+ * Returns { exists, id, title } or { exists:false } on any failure.
+ */
+function fetchEventByThread_(conf, threadId) {
+  if (!conf || !conf.ok || !threadId) return { exists: false };
+  try {
+    var resp = UrlFetchApp.fetch(
+      conf.backendUrl + '/api/addon/event-by-thread?thread_id=' +
+        encodeURIComponent(threadId),
+      {
+        method: 'get',
+        headers: { 'X-Addon-Key': conf.apiKey },
+        muteHttpExceptions: true
+      }
+    );
+    if (resp.getResponseCode() !== 200) return { exists: false };
+    var data = JSON.parse(resp.getContentText());
+    return data && data.exists ? data : { exists: false };
+  } catch (err) {
+    return { exists: false };
+  }
+}
+
+/** Builds the hosted URL for a day, forcing the right Google account. */
+function dayUrl_(conf, eventId) {
+  return conf.backendUrl + '/day/' + encodeURIComponent(eventId) +
+    '?authuser=' + encodeURIComponent(GMAIL_ACCOUNT);
 }
 
 /**
@@ -284,6 +355,7 @@ function createDay(e) {
   }
 
   rememberEvent_(thread.getId(), data.event_id, data.url);
+  tagThreadAsDay_(message);
 
   // Build a result card with an OpenLink to the new day.
   var card = CardService.newCardBuilder()
@@ -381,6 +453,7 @@ function linkDay(e) {
   }
 
   rememberEvent_(thread.getId(), data.event_id, data.url);
+  tagThreadAsDay_(message);
 
   var card = CardService.newCardBuilder()
     .setHeader(CardService.newCardHeader().setTitle('המייל קושר ליום'))
@@ -487,6 +560,24 @@ function draftReply(e) {
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
+
+/** Returns (creating if needed) the Gmail label used to mark fun-day threads. */
+function ensureLabel_() {
+  return GmailApp.getUserLabelByName(DAY_LABEL) || GmailApp.createLabel(DAY_LABEL);
+}
+
+/**
+ * Tags the given message's thread with the fun-day label. Best-effort: a
+ * labeling failure (e.g. missing scope) must never break the surrounding flow.
+ */
+function tagThreadAsDay_(message) {
+  try {
+    if (!message) return;
+    message.getThread().addLabel(ensureLabel_());
+  } catch (err) {
+    // Intentionally swallowed — labeling is a nicety, not critical path.
+  }
+}
 
 /** Returns an ActionResponse that just shows a notification. */
 function notify_(text) {

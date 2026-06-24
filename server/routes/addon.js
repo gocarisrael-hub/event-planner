@@ -111,6 +111,23 @@ router.post('/link-day', (req, res) => {
   res.status(201).json({ event_id: event.id, url: `${base}/day/${event.id}` });
 });
 
+// --- Does a day already exist for this email thread? ----------------------
+router.get('/event-by-thread', (req, res) => {
+  const threadId = req.query.thread_id;
+  if (!threadId) return res.json({ exists: false });
+  const matches = events
+    .where((e) => e.email && e.email.thread_id === threadId)
+    .slice()
+    .sort((a, b) =>
+      String(b.updated_at || b.created_at || '').localeCompare(
+        String(a.updated_at || a.created_at || '')
+      )
+    );
+  const event = matches[0];
+  if (!event) return res.json({ exists: false });
+  res.json({ exists: true, id: event.id, title: event.title || '' });
+});
+
 // --- Proposal PDF (no prices) for an event --------------------------------
 router.get('/proposal-pdf', async (req, res) => {
   const { event_id: eventId, thread_id: threadId } = req.query;
