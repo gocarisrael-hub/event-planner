@@ -554,6 +554,10 @@ export default function DayBuilder() {
           />
         )}
 
+        <div className="mb-4">
+          <AddActivityRow onAdd={onAdd} />
+        </div>
+
         {/* Private notes — never shown in the client proposal/PDF. Full-width
             at the top of the main column for a larger, more comfortable area. */}
         <div className="bg-white rounded-xl border border-slate-200 p-4 text-sm mb-4">
@@ -576,10 +580,6 @@ export default function DayBuilder() {
             placeholder="תזכורות, דגשים פנימיים…"
             className={`${field} mt-2 resize-y`}
           />
-        </div>
-
-        <div className="mb-4">
-          <AddActivityRow onAdd={onAdd} />
         </div>
 
         {items.length === 0 ? (
@@ -630,66 +630,6 @@ export default function DayBuilder() {
         >
           תצוגת הצעה ל-PDF →
         </Link>
-        {/* Private file attachments — internal docs, never in the proposal. */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 text-sm">
-          <div className="flex items-baseline justify-between gap-2 mb-2">
-            <div>
-              <div className="font-medium">קבצים</div>
-              <div className="text-xs text-slate-400">מסמכים פנימיים — חוזה, קבלה וכו'</div>
-            </div>
-          </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={onPickFiles}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="w-full border border-ocar text-ocar px-3 py-2 rounded-lg font-medium hover:bg-ocar-soft disabled:opacity-60"
-          >
-            {uploading ? 'מעלה…' : '+ העלה קובץ'}
-          </button>
-
-          {(event.files || []).length === 0 ? (
-            <p className="text-slate-400 mt-3">אין קבצים עדיין</p>
-          ) : (
-            <ul className="mt-3 space-y-2">
-              {(event.files || []).map((file) => (
-                <li
-                  key={file.id}
-                  className="flex items-center gap-2 border border-slate-100 rounded-lg px-2 py-1.5"
-                >
-                  <span className="flex-shrink-0">{fileIcon(file)}</span>
-                  <div className="flex-1 min-w-0">
-                    <a
-                      href={file.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block truncate text-ocar hover:underline"
-                      title={file.name}
-                    >
-                      {file.name}
-                    </a>
-                    <div className="text-xs text-slate-400">{fileSize(file.size)}</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onDeleteFile(file)}
-                    className="flex-shrink-0 text-slate-400 hover:text-red-600"
-                    title="מחק"
-                  >
-                    ✕
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
         {event.requests && (
           <div className="bg-white rounded-xl border border-slate-200 p-4 text-sm">
             <div className="font-medium mb-1">מה הם רצו</div>
@@ -786,6 +726,66 @@ export default function DayBuilder() {
             </div>
           </div>
         )}
+
+        {/* Private file attachments — internal docs, never in the proposal. */}
+        <div className="bg-white rounded-xl border border-slate-200 p-4 text-sm">
+          <div className="flex items-baseline justify-between gap-2 mb-2">
+            <div>
+              <div className="font-medium">קבצים</div>
+              <div className="text-xs text-slate-400">מסמכים פנימיים — חוזה, קבלה וכו'</div>
+            </div>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={onPickFiles}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="w-full border border-ocar text-ocar px-3 py-2 rounded-lg font-medium hover:bg-ocar-soft disabled:opacity-60"
+          >
+            {uploading ? 'מעלה…' : '+ העלה קובץ'}
+          </button>
+
+          {(event.files || []).length === 0 ? (
+            <p className="text-slate-400 mt-3">אין קבצים עדיין</p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {(event.files || []).map((file) => (
+                <li
+                  key={file.id}
+                  className="flex items-center gap-2 border border-slate-100 rounded-lg px-2 py-1.5"
+                >
+                  <span className="flex-shrink-0">{fileIcon(file)}</span>
+                  <div className="flex-1 min-w-0">
+                    <a
+                      href={file.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block truncate text-ocar hover:underline"
+                      title={file.name}
+                    >
+                      {file.name}
+                    </a>
+                    <div className="text-xs text-slate-400">{fileSize(file.size)}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteFile(file)}
+                    className="flex-shrink-0 text-slate-400 hover:text-red-600"
+                    title="מחק"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </aside>
 
       {editingItem && (
