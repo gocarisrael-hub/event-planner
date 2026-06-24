@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client.js';
-import { brand } from '../brand/brand.js';
 import { whenLabel } from '../utils/format.js';
-import { STATUSES, statusBadgeClass, statusLabel } from '../utils/status.js';
 
 export default function Dashboard() {
   const [events, setEvents] = useState([]);
@@ -34,19 +32,8 @@ export default function Dashboard() {
     setEvents((prev) => prev.filter((ev) => ev.id !== id));
   };
 
-  // Optimistically update the row's status, then PATCH it via the api.
-  const changeStatus = async (id, status) => {
-    const prev = events;
-    setEvents((list) => list.map((ev) => (ev.id === id ? { ...ev, status } : ev)));
-    try {
-      await api.updateEvent(id, { status });
-    } catch {
-      setEvents(prev); // roll back on failure
-    }
-  };
-
   return (
-    <div dir="rtl">
+    <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">הימים שלי</h1>
         <button
@@ -81,83 +68,33 @@ export default function Dashboard() {
           <p className="text-slate-500">לא נמצאו ימים שמתאימים לחיפוש.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
-          <table className="w-full text-right text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-slate-500">
-                <th className="px-4 py-3 font-medium">שם היום</th>
-                <th className="px-4 py-3 font-medium">לקוח</th>
-                <th className="px-4 py-3 font-medium">מתי</th>
-                <th className="px-4 py-3 font-medium">סטטוס</th>
-                <th className="px-4 py-3 font-medium">פעילויות</th>
-                <th className="px-4 py-3 font-medium">מייל</th>
-                <th className="px-4 py-3 font-medium" />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((ev) => (
-                <tr key={ev.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                  <td className="px-4 py-3">
-                    <Link to={`/day/${ev.id}`} className="font-medium text-slate-800 hover:text-ocar">
-                      {ev.title}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">{ev.client_name || '—'}</td>
-                  <td className="px-4 py-3 text-slate-600">{whenLabel(ev) || '—'}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`inline-block px-2 py-1 rounded text-xs whitespace-nowrap ${statusBadgeClass(ev.status)}`}
-                      >
-                        {statusLabel(ev.status)}
-                      </span>
-                      <select
-                        value={STATUSES.some((s) => s.key === ev.status) ? ev.status : 'draft'}
-                        onChange={(e) => changeStatus(ev.id, e.target.value)}
-                        className="border border-slate-300 rounded px-1 py-1 text-xs bg-white focus:outline-none focus:border-ocar"
-                        aria-label="שינוי סטטוס"
-                      >
-                        {STATUSES.map((s) => (
-                          <option key={s.key} value={s.key}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">
-                    {ev.items?.length ?? '—'}
-                  </td>
-                  <td className="px-4 py-3">
-                    {ev.email?.message_id ? (
-                      <a
-                        href={`https://mail.google.com/mail/?authuser=${encodeURIComponent(brand.gmailAccount)}#all/${ev.email.message_id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-ocar hover:underline whitespace-nowrap"
-                      >
-                        פתח מייל
-                      </a>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <Link to={`/day/${ev.id}`} className="text-ocar font-medium hover:underline">
-                      פתח
-                    </Link>
-                    <button
-                      onClick={(e) => remove(e, ev.id)}
-                      className="text-slate-300 hover:text-red-500 mr-3"
-                      title="מחיקה"
-                    >
-                      ✕
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {filtered.map((ev) => (
+            <Link
+              key={ev.id}
+              to={`/day/${ev.id}`}
+              className="bg-white rounded-xl border border-slate-200 p-4 hover:border-ocar transition group"
+            >
+              <div className="flex items-start justify-between">
+                <h2 className="font-bold text-lg group-hover:text-ocar">{ev.title}</h2>
+                <button
+                  onClick={(e) => remove(e, ev.id)}
+                  className="text-slate-300 hover:text-red-500 text-sm"
+                  title="מחיקה"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 mt-1">
+                {ev.client_name && `${ev.client_name} · `}
+                {ev.group_size ? `${ev.group_size} משתתפים` : ''}
+              </p>
+              <div className="flex gap-2 mt-3 text-xs text-slate-400">
+                {whenLabel(ev) && <span className="bg-slate-100 px-2 py-1 rounded">{whenLabel(ev)}</span>}
+                <span className="bg-slate-100 px-2 py-1 rounded">{ev.items?.length || 0} פעילויות</span>
+              </div>
+            </Link>
+          ))}
         </div>
       )}
     </div>
