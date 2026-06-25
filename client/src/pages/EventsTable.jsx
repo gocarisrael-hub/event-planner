@@ -10,10 +10,13 @@ export default function EventsTable() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
+  const [sortKey, setSortKey] = useState('sent'); // default sort by נשלח
+  const [sortDir, setSortDir] = useState('desc');
 
   // Ensure dynamic statuses are loaded so the pills resolve labels/colors.
   const statusesLoaded = useStatusStore((s) => s.loaded);
   const loadStatuses = useStatusStore((s) => s.load);
+  const statuses = useStatusStore((s) => s.statuses);
 
   useEffect(() => {
     if (!statusesLoaded) loadStatuses();
@@ -34,6 +37,64 @@ export default function EventsTable() {
       return fields.some((f) => (f || '').toLowerCase().includes(q));
     });
   }, [events, query]);
+
+  // Toggle sorting: same key flips direction; a new key starts ascending.
+  const toggleSort = (key) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  // Per-column sort comparator. Nullish/empty values always sort last,
+  // regardless of direction.
+  const sorted = useMemo(() => {
+    const statusOrder = (id) => {
+      const s = statuses.find((x) => x.id === id);
+      return s && s.order != null ? s.order : Number.MAX_SAFE_INTEGER;
+    };
+    const epoch = (d) => {
+      if (!d) return null;
+      const t = new Date(d).getTime();
+      return Number.isNaN(t) ? null : t;
+    };
+
+    // Returns a sort value for the active key; null means "empty → last".
+    const valueOf = (ev) => {
+      switch (sortKey) {
+        case 'title':
+          return ev.title ? ev.title : null;
+        case 'client_name':
+          return ev.client_name ? ev.client_name : null;
+        case 'when':
+          return epoch(ev.target_date);
+        case 'status':
+          return statusOrder(ev.status);
+        case 'sent':
+          return epoch(ev.emails?.[ev.emails.length - 1]?.date);
+        default:
+          return null;
+      }
+    };
+
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const isText = sortKey === 'title' || sortKey === 'client_name';
+
+    return [...filtered].sort((a, b) => {
+      const av = valueOf(a);
+      const bv = valueOf(b);
+      // Push nullish to the bottom in both directions.
+      const aNull = av == null;
+      const bNull = bv == null;
+      if (aNull && bNull) return 0;
+      if (aNull) return 1;
+      if (bNull) return -1;
+      if (isText) return dir * av.localeCompare(bv, 'he', { sensitivity: 'base' });
+      return dir * (av - bv);
+    });
+  }, [filtered, sortKey, sortDir, statuses]);
 
   // Optimistically update the row's status, then PATCH it via the api.
   const changeStatus = async (id, status) => {
@@ -89,17 +150,17 @@ export default function EventsTable() {
           <table className="w-full text-right text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-slate-500">
-                <th className="px-4 py-3 font-medium">שם היום</th>
-                <th className="px-4 py-3 font-medium">לקוח</th>
-                <th className="px-4 py-3 font-medium">מתי</th>
-                <th className="px-4 py-3 font-medium">סטטוס</th>
+                <SortHeader label="שם היום" sortKey="title" active={sortKey} dir={sortDir} onSort={toggleSort} />
+                <SortHeader label="לקוח" sortKey="client_name" active={sortKey} dir={sortDir} onSort={toggleSort} />
+                <SortHeader label="מתי" sortKey="when" active={sortKey} dir={sortDir} onSort={toggleSort} />
+                <SortHeader label="סטטוס" sortKey="status" active={sortKey} dir={sortDir} onSort={toggleSort} />
                 <th className="px-4 py-3 font-medium">מייל</th>
-                <th className="px-4 py-3 font-medium">נשלח</th>
+                <SortHeader label="נשלח" sortKey="sent" active={sortKey} dir={sortDir} onSort={toggleSort} />
                 <th className="px-4 py-3 font-medium" />
               </tr>
             </thead>
             <tbody>
-              {filtered.map((ev) => (
+              {sorted.map((ev) => (
                 <tr key={ev.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <Link to={`/day/${ev.id}`} className="font-medium text-slate-800 hover:text-ocar">
@@ -143,5 +204,27 @@ export default function EventsTable() {
         </div>
       )}
     </div>
+  );
+}
+
+// A clickable column header (full cell) showing the label plus a subtle sort
+// arrow: faint ↕ when inactive, ↑ for ascending, ↓ for descending. RTL-correct.
+function SortHeader({ label, sortKey, active, dir, onSort }) {
+  const isActive = active === sortKey;
+  const arrow = isActive ? (dir === 'asc' ? '↑' : '↓') : '↕';
+  return (
+    <th className="px-4 py-3 font-medium">
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        aria-label={`מיון לפי ${label}`}
+        className="inline-flex items-center gap-1 font-medium hover:text-slate-700 transition cursor-pointer"
+      >
+        <span>{label}</span>
+        <span className={isActive ? 'text-ocar' : 'text-slate-300'} aria-hidden="true">
+          {arrow}
+        </span>
+      </button>
+    </th>
   );
 }
