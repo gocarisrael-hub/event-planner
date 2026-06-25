@@ -119,7 +119,7 @@ export default function DatePicker({ value, onChange }) {
           <div className="flex items-center justify-between mb-2">
             <button
               type="button"
-              onClick={() => goMonth(1)}
+              onClick={() => goMonth(-1)}
               className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
               aria-label="חודש קודם"
             >
@@ -128,7 +128,7 @@ export default function DatePicker({ value, onChange }) {
             <span className="text-sm font-semibold text-slate-800">{monthLabel}</span>
             <button
               type="button"
-              onClick={() => goMonth(-1)}
+              onClick={() => goMonth(1)}
               className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
               aria-label="חודש הבא"
             >
