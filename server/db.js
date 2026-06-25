@@ -1,7 +1,7 @@
 // Tiny JSON-file data store. No native deps — safe to install/run anywhere.
 // Collections: categories (defined list), catalog (reusable activities),
 // events (days), items (schedule blocks).
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID, scryptSync } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,7 +10,26 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.DATA_DIR || join(__dirname, 'data');
 const DATA_FILE = join(DATA_DIR, 'app.json');
 
-const EMPTY = { categories: [], catalog: [], events: [], items: [], statuses: [] };
+const EMPTY = {
+  categories: [],
+  catalog: [],
+  events: [],
+  items: [],
+  statuses: [],
+  users: [],
+  sessions: [],
+};
+
+// --- Password hashing (node:crypto scrypt, no native deps) -----------------
+// Returns { password_hash, salt } both as hex strings.
+export function hashPassword(password, salt = randomBytes(16).toString('hex')) {
+  const password_hash = scryptSync(String(password), salt, 64).toString('hex');
+  return { password_hash, salt };
+}
+
+// Default seeded admin — note in PR body so the user changes it.
+const DEFAULT_ADMIN_EMAIL = 'gocarisrael@gmail.com';
+const DEFAULT_ADMIN_PASSWORD = 'admin1234';
 
 // Seed statuses — ids EXACTLY equal the legacy status keys so existing events
 // keep matching. Statuses are dynamic / user-editable from here on.
@@ -67,7 +86,24 @@ function seed() {
     events: [],
     items: [],
     statuses: DEFAULT_STATUSES.map((s) => ({ ...s })),
+    users: seedUsers(),
+    sessions: [],
   };
+}
+
+// One default admin account (only used when the users collection is empty).
+function seedUsers() {
+  const { password_hash, salt } = hashPassword(DEFAULT_ADMIN_PASSWORD);
+  return [
+    {
+      id: randomUUID(),
+      email: DEFAULT_ADMIN_EMAIL,
+      role: 'admin',
+      password_hash,
+      salt,
+      created_at: new Date().toISOString(),
+    },
+  ];
 }
 
 // In-place migration of legacy price-range fields to a single price.
@@ -77,6 +113,15 @@ function migrate(d) {
   // Seed the statuses collection if absent/empty (existing data files).
   if (!Array.isArray(d.statuses) || d.statuses.length === 0) {
     d.statuses = DEFAULT_STATUSES.map((s) => ({ ...s }));
+    changed = true;
+  }
+  // Seed the users collection (default admin) if absent/empty.
+  if (!Array.isArray(d.users) || d.users.length === 0) {
+    d.users = seedUsers();
+    changed = true;
+  }
+  if (!Array.isArray(d.sessions)) {
+    d.sessions = [];
     changed = true;
   }
   for (const c of d.catalog || []) {
@@ -191,4 +236,6 @@ export const catalog = col('catalog');
 export const events = col('events');
 export const items = col('items');
 export const statuses = col('statuses');
+export const users = col('users');
+export const sessions = col('sessions');
 export { persist };

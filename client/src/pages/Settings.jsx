@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Categories from './Categories.jsx';
+import { api } from '../api/client.js';
 import { useStatusStore } from '../store/useStatusStore.js';
 import { COLORS, COLOR_MAP, statusBadgeClass, statusDotClass } from '../utils/status.js';
 
@@ -147,6 +148,111 @@ function StatusesSection() {
   );
 }
 
+function UsersSection() {
+  const [users, setUsers] = useState([]);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState('viewer');
+  const [error, setError] = useState('');
+
+  const reload = async () => {
+    try {
+      setUsers(await api.listUsers());
+    } catch {
+      // ignore — non-admins never reach this page
+    }
+  };
+
+  useEffect(() => {
+    reload();
+  }, []);
+
+  const add = async () => {
+    setError('');
+    if (!email.trim() || !password) {
+      setError('יש להזין אימייל וסיסמה.');
+      return;
+    }
+    try {
+      await api.createUser({ email: email.trim(), password, role });
+      setEmail('');
+      setPassword('');
+      setRole('viewer');
+      reload();
+    } catch (e) {
+      if (e.serverCode === 'email_exists') setError('האימייל כבר קיים.');
+      else setError('יצירת המשתמש נכשלה.');
+    }
+  };
+
+  const del = async (u) => {
+    if (!confirm(`למחוק את המשתמש "${u.email}"?`)) return;
+    try {
+      await api.deleteUser(u.id);
+      reload();
+    } catch (e) {
+      if (e.serverCode === 'last_admin') alert('לא ניתן למחוק את מנהל המערכת האחרון.');
+      else alert('מחיקת המשתמש נכשלה.');
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      {users.map((u) => (
+        <div
+          key={u.id}
+          className="bg-white rounded-xl border border-slate-200 p-3 flex items-center gap-3 flex-wrap"
+        >
+          <span className="flex-1 min-w-[10rem] text-sm">{u.email}</span>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-medium ${
+              u.role === 'admin' ? 'bg-ocar-soft text-ocar' : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            {u.role === 'admin' ? 'מנהל' : 'צופה'}
+          </span>
+          <button
+            onClick={() => del(u)}
+            className="text-slate-300 hover:text-red-500 px-2"
+            aria-label="מחק"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      {users.length === 0 && <p className="text-slate-400 text-sm">עוד אין משתמשים.</p>}
+
+      <div className="bg-white rounded-xl border border-dashed border-slate-300 p-3 flex items-center gap-3 flex-wrap">
+        <input
+          className={`${field} flex-1 min-w-[12rem]`}
+          placeholder="אימייל"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <input
+          className={`${field} flex-1 min-w-[10rem]`}
+          placeholder="סיסמה"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <select className={field} value={role} onChange={(e) => setRole(e.target.value)}>
+          <option value="viewer">צופה</option>
+          <option value="admin">מנהל</option>
+        </select>
+        <button
+          onClick={add}
+          className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90"
+        >
+          + הוסף משתמש
+        </button>
+      </div>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 export default function Settings() {
   return (
     <div dir="rtl" className="max-w-2xl">
@@ -156,12 +262,20 @@ export default function Settings() {
         <Categories />
       </section>
 
-      <section>
+      <section className="mb-12">
         <h2 className="text-xl font-bold mb-1">סטטוסים</h2>
         <p className="text-slate-500 mb-4 text-sm">
           הסטטוסים שאפשר לשייך לימים. אפשר לערוך שם, צבע, סדר, להוסיף ולמחוק.
         </p>
         <StatusesSection />
+      </section>
+
+      <section>
+        <h2 className="text-xl font-bold mb-1">משתמשים</h2>
+        <p className="text-slate-500 mb-4 text-sm">
+          ניהול חשבונות גישה. מנהל — גישה מלאה; צופה — רק עמוד הסטטוס.
+        </p>
+        <UsersSection />
       </section>
     </div>
   );
