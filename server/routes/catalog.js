@@ -1,8 +1,26 @@
 // Reusable catalog of activities + the defined category list.
+import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, unlink } from 'node:fs';
+import { dirname, extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Router } from 'express';
+import multer from 'multer';
 import { catalog, categories } from '../db.js';
 
 const router = Router();
+
+// Catalog-activity file attachments → disk (same volume/served at /uploads as
+// day-files). Accepts ANY file type (no image filter), capped at 25MB. Mirrors
+// the day-file pattern in routes/events.js.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const UPLOAD_DIR = process.env.UPLOADS_DIR || join(__dirname, '..', 'uploads');
+if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const fileStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+  filename: (_req, file, cb) => cb(null, `${randomUUID()}${extname(file.originalname)}`),
+});
+const fileUpload = multer({ storage: fileStorage, limits: { fileSize: 25 * 1024 * 1024 } });
 
 // --- Catalog activities ---------------------------------------------------
 router.get('/', (_req, res) => res.json(catalog.all()));
@@ -20,6 +38,7 @@ router.post('/', (req, res) => {
     location: b.location || '',
     photos: b.photos || [],
     tags: b.tags || [],
+    files: [],
   });
   res.status(201).json(row);
 });
@@ -31,6 +50,39 @@ router.patch('/:id', (req, res) => {
 });
 
 router.delete('/:id', (req, res) => res.json({ ok: catalog.remove(req.params.id) }));
+
+// --- Files (attachments appended to proposal PDFs) ------------------------
+router.post('/:id/files', fileUpload.single('file'), (req, res) => {
+  const row = catalog.find(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  if (!req.file) return res.status(400).json({ error: 'no file uploaded' });
+  const file = {
+    id: randomUUID(),
+    // multer/busboy decodes the multipart filename as latin1; re-decode to
+    // utf8 so Hebrew (and other non-ASCII) names aren't mojibake/squares.
+    name: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
+    type: req.file.mimetype,
+    size: req.file.size,
+    url: `/uploads/${req.file.filename}`,
+    uploaded_at: new Date().toISOString(),
+  };
+  const files = [...(row.files || []), file];
+  catalog.update(row.id, { files });
+  res.status(201).json(file);
+});
+
+router.delete('/:id/files/:fileId', (req, res) => {
+  const row = catalog.find(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  const file = (row.files || []).find((f) => f.id === req.params.fileId);
+  const files = (row.files || []).filter((f) => f.id !== req.params.fileId);
+  catalog.update(row.id, { files });
+  // Best-effort disk cleanup; ignore errors (e.g. already gone).
+  if (file && file.url) {
+    unlink(join(UPLOAD_DIR, file.url.replace(/^\/uploads\//, '')), () => {});
+  }
+  res.json({ ok: true });
+});
 
 export default router;
 

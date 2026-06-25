@@ -1,9 +1,11 @@
 // Render the proposal HTML to a PDF Buffer via headless Puppeteer.
 // A single browser instance is reused across calls.
 import { readFile } from 'node:fs/promises';
-import { dirname, basename, join } from 'node:path';
+import { dirname, basename, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Jimp } from 'jimp';
+import { PDFDocument } from 'pdf-lib';
+import { catalog } from '../db.js';
 import { proposalHtml } from './template.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -62,6 +64,88 @@ async function readLogoDataUri() {
   }
 }
 
+// Gather the unique files attached to the catalog activities used by this
+// event's items (and their options). Deduped by file id; schedule order is
+// preserved (items in schedule order, then options within each item).
+function collectAttachments(event) {
+  const seen = new Set();
+  const out = [];
+  const addFrom = (catalogId) => {
+    if (!catalogId) return;
+    const c = catalog.find(catalogId);
+    if (!c) return;
+    for (const f of c.files || []) {
+      if (!f || !f.id || seen.has(f.id)) continue;
+      seen.add(f.id);
+      out.push(f);
+    }
+  };
+  for (const it of event.items || []) {
+    addFrom(it.catalog_activity_id);
+    for (const o of it.options || []) addFrom(o.catalog_activity_id);
+  }
+  return out;
+}
+
+const isPdf = (f) =>
+  (f.type || '') === 'application/pdf' || extname(f.name || '').toLowerCase() === '.pdf';
+const isJpeg = (f) =>
+  /^image\/jpe?g$/.test(f.type || '') ||
+  ['.jpg', '.jpeg'].includes(extname(f.name || '').toLowerCase());
+const isPng = (f) =>
+  (f.type || '') === 'image/png' || extname(f.name || '').toLowerCase() === '.png';
+
+// Append the attached catalog files to the proposal PDF (whole files as pages):
+// PDFs are copied page-for-page; JPEG/PNG images each get a fitted A4 page;
+// any other type (docx/xlsx/…) is skipped with a warning. Wrapped so a bad
+// attachment never breaks generation — on any failure the original buffer is
+// returned unchanged. Returns the original buffer when there are no files.
+async function appendAttachments(proposalBuffer, event) {
+  const attachments = collectAttachments(event);
+  if (attachments.length === 0) return proposalBuffer;
+  try {
+    const merged = await PDFDocument.load(proposalBuffer);
+    for (const f of attachments) {
+      try {
+        const bytes = await readFile(join(UPLOAD_DIR, basename(f.url || f.name || '')));
+        if (isPdf(f)) {
+          const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
+          const pages = await merged.copyPages(src, src.getPageIndices());
+          for (const p of pages) merged.addPage(p);
+        } else if (isJpeg(f) || isPng(f)) {
+          const img = isPng(f) ? await merged.embedPng(bytes) : await merged.embedJpg(bytes);
+          // A4 portrait at 72dpi, with a margin; scale the image to fit.
+          const PAGE_W = 595.28;
+          const PAGE_H = 841.89;
+          const MARGIN = 28;
+          const page = merged.addPage([PAGE_W, PAGE_H]);
+          const maxW = PAGE_W - MARGIN * 2;
+          const maxH = PAGE_H - MARGIN * 2;
+          const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+          const w = img.width * scale;
+          const h = img.height * scale;
+          page.drawImage(img, {
+            x: (PAGE_W - w) / 2,
+            y: (PAGE_H - h) / 2,
+            width: w,
+            height: h,
+          });
+        } else {
+          console.warn(`Skipping un-mergeable proposal attachment: ${f.name || f.url}`);
+        }
+      } catch (err) {
+        console.warn(`Failed to append attachment "${f.name || f.url}": ${err.message}`);
+      }
+    }
+    const out = await merged.save();
+    return Buffer.from(out);
+  } catch (err) {
+    // A corrupt proposal buffer or any unexpected failure → fall back.
+    console.warn(`Attachment merge failed, returning un-merged PDF: ${err.message}`);
+    return proposalBuffer;
+  }
+}
+
 let browserPromise = null;
 
 async function getBrowser() {
@@ -103,7 +187,9 @@ export async function generateProposalPdf(event, { prices } = { prices: false })
     const out = await page.pdf({ format: 'A4', printBackground: true });
     // Modern Puppeteer returns a Uint8Array; normalize to a Node Buffer so
     // callers can rely on buffer.toString('base64') etc.
-    return Buffer.isBuffer(out) ? out : Buffer.from(out);
+    const proposalBuffer = Buffer.isBuffer(out) ? out : Buffer.from(out);
+    // Append any files attached to the catalog activities used by this event.
+    return appendAttachments(proposalBuffer, event);
   } finally {
     await page.close().catch(() => {});
   }
