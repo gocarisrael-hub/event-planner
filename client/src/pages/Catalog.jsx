@@ -1,10 +1,107 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { api } from '../api/client.js';
 import CategorySelect from '../components/CategorySelect.jsx';
 import PhotoUploader from '../components/PhotoUploader.jsx';
 import { useCatalogStore } from '../store/useCatalogStore.js';
 import { formatDuration, formatPrice } from '../utils/format.js';
 
 const field = 'w-full border border-slate-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-ocar';
+
+// Pick a type icon for a catalog file from its extension or mime type.
+function fileIcon(file) {
+  const ext = (file.name || '').split('.').pop()?.toLowerCase() || '';
+  const mime = file.type || '';
+  if (ext === 'pdf' || mime === 'application/pdf') return '📄';
+  if (['doc', 'docx'].includes(ext) || mime.includes('word')) return '📝';
+  if (['xls', 'xlsx', 'csv'].includes(ext) || mime.includes('sheet') || mime.includes('excel'))
+    return '📊';
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext) || mime.startsWith('image/'))
+    return '🖼️';
+  if (['zip', 'rar', '7z'].includes(ext) || mime.includes('zip')) return '🗜️';
+  return '📎';
+}
+
+// Human-friendly file size (KB / MB).
+function fileSize(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Files attached to a catalog activity — appended to the proposal PDF whenever
+// the activity is used in a fun-day. Mirrors the private day-files UI.
+function CatalogFiles({ item, onChanged }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const files = item.files || [];
+
+  const onPick = async (e) => {
+    const chosen = Array.from(e.target.files || []);
+    if (chosen.length === 0) return;
+    setUploading(true);
+    try {
+      for (const f of chosen) await api.addCatalogFile(item.id, f);
+      await onChanged();
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  const onDelete = async (file) => {
+    if (!window.confirm(`למחוק את "${file.name}"?`)) return;
+    await api.deleteCatalogFile(item.id, file.id);
+    await onChanged();
+  };
+
+  return (
+    <div className="mt-2 border-t border-slate-100 pt-2">
+      <div className="text-xs text-slate-400 mb-1">קבצים — יצורפו להצעת PDF כשהפעילות בשימוש</div>
+      <input ref={inputRef} type="file" multiple className="hidden" onChange={onPick} />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className="text-ocar text-sm font-medium hover:underline disabled:opacity-60"
+      >
+        {uploading ? 'מעלה…' : '+ הוסף קובץ'}
+      </button>
+      {files.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {files.map((file) => (
+            <li
+              key={file.id}
+              className="flex items-center gap-2 border border-slate-100 rounded-lg px-2 py-1"
+            >
+              <span className="flex-shrink-0">{fileIcon(file)}</span>
+              <div className="flex-1 min-w-0">
+                <a
+                  href={file.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block truncate text-ocar hover:underline text-sm"
+                  title={file.name}
+                >
+                  {file.name}
+                </a>
+                <div className="text-xs text-slate-400">{fileSize(file.size)}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onDelete(file)}
+                className="flex-shrink-0 text-slate-400 hover:text-red-600"
+                title="מחק"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 const blank = {
   title: '', description: '', category: '',
   default_duration_hours: '', default_price: '',
@@ -12,7 +109,7 @@ const blank = {
 };
 
 export default function Catalog() {
-  const { catalog, categories, loaded, load, addCatalog, updateCatalog, removeCatalog } =
+  const { catalog, categories, loaded, load, refresh, addCatalog, updateCatalog, removeCatalog } =
     useCatalogStore();
   const [draft, setDraft] = useState(blank);
   const [editing, setEditing] = useState(null); // id
@@ -139,6 +236,7 @@ export default function Catalog() {
                 <input className={field} value={c.location || ''} placeholder="מרחב"
                   onChange={(e) => updateCatalog(c.id, { location: e.target.value })} />
                 <PhotoUploader photos={c.photos || []} onChange={(photos) => updateCatalog(c.id, { photos })} small />
+                <CatalogFiles item={c} onChanged={refresh} />
                 <button onClick={() => setEditing(null)} className="text-ocar text-sm font-medium">סיום</button>
               </div>
             ) : (
@@ -168,6 +266,7 @@ export default function Catalog() {
                     ))}
                   </div>
                 )}
+                <CatalogFiles item={c} onChanged={refresh} />
               </>
             )}
           </div>

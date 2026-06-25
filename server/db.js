@@ -133,6 +133,11 @@ function migrate(d) {
       delete c.default_price_max;
       changed = true;
     }
+    // Catalog activities can carry attached files (appended to proposal PDFs).
+    if (!Array.isArray(c.files)) {
+      c.files = [];
+      changed = true;
+    }
   }
   for (const ev of d.events || []) {
     // Migrate the legacy singular `email` to an `emails` array.

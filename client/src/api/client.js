@@ -113,6 +113,22 @@ export const api = {
   deleteDayFile: (eventId, fileId) =>
     req('DELETE', `/api/events/${eventId}/files/${fileId}`),
 
+  // catalog-activity files (appended to proposal PDFs)
+  addCatalogFile: async (catalogId, file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(`/api/catalog/${catalogId}/files`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: fd,
+    });
+    if (res.status === 401) handle401();
+    if (!res.ok) throw new Error('upload failed');
+    return res.json(); // file object
+  },
+  deleteCatalogFile: (catalogId, fileId) =>
+    req('DELETE', `/api/catalog/${catalogId}/files/${fileId}`),
+
   // uploads
   uploadPhoto: async (file) => {
     const fd = new FormData();
