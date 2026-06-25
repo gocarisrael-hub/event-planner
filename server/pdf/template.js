@@ -162,6 +162,8 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
       }
     }
 
+    const itemContact = [it.contact_name, it.contact_phone].filter(Boolean).join(' · ');
+
     let optionsHtml = '';
     if (hasOptions) {
       const opts = it.options.map((o) => {
@@ -201,6 +203,7 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
           <div class="item-main">
             <div class="item-title">${esc(it.title)}</div>
             ${it.description ? `<div class="item-desc">${esc(it.description)}</div>` : ''}
+            ${itemContact ? `<div class="item-contact">איש קשר: ${esc(itemContact)}</div>` : ''}
           </div>
           ${slotPrice}
         </div>
@@ -221,6 +224,14 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
             <span class="totals-group-value">${esc(formatRange(low * event.group_size, high * event.group_size))}</span>
           </div>` : ''}
       </div>`
+    : '';
+
+  // When prices are hidden, surface the planned per-person goal budget instead
+  // of real totals. event.budget is already a per-person ("לראש") figure.
+  const budgetNum = Number(event.budget);
+  const budgetHtml = !showPrices && Number.isFinite(budgetNum) && budgetNum > 0
+    ? `
+      <div class="budget">תקציב משוער לאדם: ₪${esc(budgetNum.toLocaleString('he-IL'))}</div>`
     : '';
 
   return `<!DOCTYPE html>
@@ -254,7 +265,6 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   .header-meta { text-align: left; font-size: 13px; color: #64748b; }
   .header-meta .hm-name { font-weight: 600; color: #334155; }
   h1.title { font-size: 28px; font-weight: 800; color: ${BRAND.dark}; margin: 0 0 8px; }
-  .requests { color: #475569; margin: 0 0 24px; }
   h2.sched { font-size: 18px; font-weight: 700; color: ${BRAND.primary}; margin: 0 0 12px; }
   .item { border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 12px; page-break-inside: avoid; }
   .item-row { display: flex; gap: 16px; align-items: flex-start; }
@@ -265,6 +275,7 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   .item-main { flex: 1; }
   .item-title { font-weight: 600; }
   .item-desc { font-size: 13px; color: #64748b; word-break: break-word; }
+  .item-contact { font-size: 12px; color: #94a3b8; margin-top: 4px; }
   .item-price { font-size: 13px; font-weight: 500; white-space: nowrap; }
   .options { margin-top: 12px; padding-right: 106px; }
   .options-label { font-size: 12px; font-weight: 500; color: #94a3b8; margin-bottom: 8px; }
@@ -283,6 +294,7 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   .totals-value { font-weight: 800; font-size: 18px; color: ${BRAND.primary}; }
   .totals-group { display: flex; justify-content: space-between; align-items: center; color: #64748b; margin-top: 4px; }
   .totals-group-value { font-weight: 500; }
+  .budget { margin-top: 24px; padding-top: 16px; border-top: 2px solid ${BRAND.primary}; font-weight: 700; font-size: 16px; color: ${BRAND.dark}; }
   .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #94a3b8; }
 </style>
 </head>
@@ -300,12 +312,12 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
     </div>
 
     <h1 class="title">${esc(event.title || '')}</h1>
-    ${event.requests ? `<p class="requests">${esc(event.requests)}</p>` : ''}
 
     <h2 class="sched">הלו״ז ליום</h2>
     <div class="items">${itemsHtml}</div>
 
     ${totalsHtml}
+    ${budgetHtml}
 
     <div class="footer">${esc(BRAND.name)} · ${esc(BRAND.tagline)}</div>
   </div>
