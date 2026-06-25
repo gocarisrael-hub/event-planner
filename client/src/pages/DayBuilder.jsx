@@ -7,6 +7,7 @@ import BudgetMeter from '../components/BudgetMeter.jsx';
 import DatePicker from '../components/DatePicker.jsx';
 import TimelineItem from '../components/TimelineItem.jsx';
 import StatusSelect from '../components/StatusSelect.jsx';
+import { useAuthStore } from '../store/useAuthStore.js';
 import { useCatalogStore } from '../store/useCatalogStore.js';
 import { useEventStore } from '../store/useEventStore.js';
 import { formatPrice, formatRange, MONTHS, SEASONS, timingLabel, total, whenLabel } from '../utils/format.js';
@@ -61,7 +62,7 @@ function choiceRange(item, options) {
 
 // A positioned, draggable block on the timeline. Dragging changes the item's
 // start time (vertical only, snapped + clamped); clicking opens the editor.
-function TimelineBlock({ item, onDragStart, onClick, dragging, top, moveLabel, onMove }) {
+function TimelineBlock({ item, onDragStart, onClick, dragging, top, moveLabel, onMove, readOnly }) {
   const options = item.options || [];
   const hasOptions = options.length > 0;
   const height = durationToHeight(item.approx_duration_hours);
@@ -86,14 +87,16 @@ function TimelineBlock({ item, onDragStart, onClick, dragging, top, moveLabel, o
   return (
     <div
       className={`absolute right-0 left-2 flex flex-col rounded-lg border border-r-4 px-3 py-1.5 overflow-hidden select-none transition-colors ${
-        dragging
-          ? 'z-30 shadow-lg bg-ocar-soft border-ocar border-r-ocar ring-2 ring-ocar/30 cursor-grabbing'
-          : 'z-10 bg-ocar-soft/60 border-ocar/30 border-r-ocar/70 shadow-sm hover:bg-ocar-soft hover:border-ocar/50 cursor-grab'
+        readOnly
+          ? 'z-10 bg-ocar-soft/60 border-ocar/30 border-r-ocar/70 shadow-sm'
+          : dragging
+            ? 'z-30 shadow-lg bg-ocar-soft border-ocar border-r-ocar ring-2 ring-ocar/30 cursor-grabbing'
+            : 'z-10 bg-ocar-soft/60 border-ocar/30 border-r-ocar/70 shadow-sm hover:bg-ocar-soft hover:border-ocar/50 cursor-grab'
       }`}
       style={{ top, height }}
-      onPointerDown={(e) => onDragStart(e, item)}
-      onClick={onClick}
-      title="גרור כדי לשנות שעה · לחיצה לעריכה"
+      onPointerDown={readOnly ? undefined : (e) => onDragStart(e, item)}
+      onClick={readOnly ? undefined : onClick}
+      title={readOnly ? undefined : 'גרור כדי לשנות שעה · לחיצה לעריכה'}
     >
       {/* Fixed header: time + title + price/photo */}
       <div className={`flex-shrink-0 flex items-start gap-2 ${compact ? 'items-center' : ''}`}>
@@ -155,7 +158,7 @@ function TimelineBlock({ item, onDragStart, onClick, dragging, top, moveLabel, o
 // option) in two-option mode. Each instance gets its own `trackRef` so the
 // container is independent; drag math itself is pointer-delta based and works
 // per-block regardless of which column it lives in.
-function ScheduleTrack({ items, marks, drag, onDragStart, trackRef, moveLabel, onMove }) {
+function ScheduleTrack({ items, marks, drag, onDragStart, trackRef, moveLabel, onMove, readOnly }) {
   return (
     <div ref={trackRef} className="relative" style={{ height: TRACK_PX, paddingRight: 56 }}>
       {marks.map((m) => (
@@ -182,6 +185,7 @@ function ScheduleTrack({ items, marks, drag, onDragStart, trackRef, moveLabel, o
               onClick={(e) => e.preventDefault()}
               moveLabel={moveLabel}
               onMove={onMove}
+              readOnly={readOnly}
             />
           );
         })}
@@ -317,6 +321,8 @@ export default function DayBuilder() {
     useEventStore();
   const loadCatalog = useCatalogStore((s) => s.load);
   const refreshCatalog = useCatalogStore((s) => s.refresh);
+  const role = useAuthStore((s) => s.role);
+  const readOnly = role === 'viewer';
 
   const [draftPending, setDraftPending] = useState(false);
   const [draftLink, setDraftLink] = useState('');
@@ -356,7 +362,8 @@ export default function DayBuilder() {
   // so legacy items on the newly-loaded day also get positioned.
   const seeded = useRef(false);
   useEffect(() => { seeded.current = false; load(id); }, [id]);
-  useEffect(() => { loadCatalog(); }, []);
+  // Viewers can't read the catalog (server 403s it) — never load it for them.
+  useEffect(() => { if (!readOnly) loadCatalog(); }, [readOnly]);
 
   // Re-init local notes whenever we switch days (event.id change). Clear any
   // pending debounce so the previous day's edit can't bleed into the new one.
@@ -376,6 +383,7 @@ export default function DayBuilder() {
 
   // Update local notes immediately; debounce the persisted updateEvent.
   const onNotesChange = (value) => {
+    if (readOnly) return; // viewers can read notes but never persist edits
     setNotes(value);
     setNotesStatus('saving');
     if (notesTimer.current) clearTimeout(notesTimer.current);
@@ -421,6 +429,9 @@ export default function DayBuilder() {
   // item is positioned. Runs once after items load (per day).
   useEffect(() => {
     if (loading || !event || seeded.current) return;
+    // Seeding persists positions via updateItem (an admin-only PATCH that 403s
+    // for viewers). Never run it read-only — blocks fall back to DAY_START_MIN.
+    if (readOnly) return;
     seeded.current = true;
     let cursor = DAY_START_MIN;
     for (const it of items) {
@@ -430,7 +441,7 @@ export default function DayBuilder() {
         cursor = start + Math.round((it.approx_duration_hours || DEFAULT_DURATION) * 60);
       }
     }
-  }, [loading, event, items]);
+  }, [loading, event, items, readOnly]);
 
   if (loading || !event) return <p className="text-slate-400">טוען…</p>;
 
@@ -458,7 +469,7 @@ export default function DayBuilder() {
       ...data,
       approx_start: minutesToStart(startMin),
     });
-    if (!data.from_catalog_id) refreshCatalog(); // new activity landed in the catalog
+    if (!readOnly && !data.from_catalog_id) refreshCatalog(); // new activity landed in the catalog
   };
 
   // Move an item to the other option (two-option mode only).
@@ -605,13 +616,15 @@ export default function DayBuilder() {
             <h1 className="text-2xl font-bold">{event.title}</h1>
             <StatusSelect value={event.status} onChange={(s) => updateEvent({ status: s })} />
           </div>
-          <button
-            type="button"
-            onClick={() => setEditDay((v) => !v)}
-            className="flex-shrink-0 text-sm border border-slate-300 rounded-lg px-3 py-1.5 text-slate-600 hover:border-ocar hover:text-ocar"
-          >
-            {editDay ? 'סגור עריכה' : 'ערוך פרטי יום'}
-          </button>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={() => setEditDay((v) => !v)}
+              className="flex-shrink-0 text-sm border border-slate-300 rounded-lg px-3 py-1.5 text-slate-600 hover:border-ocar hover:text-ocar"
+            >
+              {editDay ? 'סגור עריכה' : 'ערוך פרטי יום'}
+            </button>
+          )}
         </div>
         <p className="text-slate-500 mb-5 text-sm">
           {[event.client_name, event.group_size && `${event.group_size} משתתפים`, whenLabel(event)]
@@ -619,7 +632,7 @@ export default function DayBuilder() {
             .join(' · ')}
         </p>
 
-        {editDay && (
+        {!readOnly && editDay && (
           <DayDetailsEditor
             event={event}
             onSave={updateEvent}
@@ -636,17 +649,19 @@ export default function DayBuilder() {
               {event.options_mode ? 'מתכננים שתי אופציות זו לצד זו' : 'תכנון יום בודד'}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => updateEvent({ options_mode: !event.options_mode })}
-            className="flex-shrink-0 text-sm border border-ocar text-ocar rounded-lg px-3 py-1.5 font-medium hover:bg-ocar-soft"
-          >
-            {event.options_mode ? 'אופציה אחת' : 'תכנן 2 אופציות'}
-          </button>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={() => updateEvent({ options_mode: !event.options_mode })}
+              className="flex-shrink-0 text-sm border border-ocar text-ocar rounded-lg px-3 py-1.5 font-medium hover:bg-ocar-soft"
+            >
+              {event.options_mode ? 'אופציה אחת' : 'תכנן 2 אופציות'}
+            </button>
+          )}
         </div>
 
         {/* Single-mode add row. In two-option mode each column has its own. */}
-        {!event.options_mode && (
+        {!readOnly && !event.options_mode && (
           <div className="mb-4">
             <AddActivityRow onAdd={onAdd()} />
           </div>
@@ -670,6 +685,7 @@ export default function DayBuilder() {
             dir="rtl"
             rows={4}
             value={notes}
+            readOnly={readOnly}
             onChange={(e) => onNotesChange(e.target.value)}
             placeholder="תזכורות, דגשים פנימיים…"
             className={`${field} mt-2 resize-y`}
@@ -688,11 +704,13 @@ export default function DayBuilder() {
               return (
                 <div key={opt} className="bg-white rounded-xl border border-slate-200 p-3">
                   <div className="font-semibold text-ocar-dark mb-2">{label}</div>
-                  <div className="mb-3">
-                    <AddActivityRow onAdd={onAdd(opt)} />
-                  </div>
+                  {!readOnly && (
+                    <div className="mb-3">
+                      <AddActivityRow onAdd={onAdd(opt)} />
+                    </div>
+                  )}
                   <div className="flex items-center justify-between text-xs mb-2">
-                    <span className="text-slate-400">גרור בלוק לקביעת שעה · לחיצה לעריכה</span>
+                    <span className="text-slate-400">{readOnly ? '' : 'גרור בלוק לקביעת שעה · לחיצה לעריכה'}</span>
                     <span className="font-medium text-ocar-dark">
                       {high > 0 ? formatRange(low, high) : '—'}
                     </span>
@@ -708,8 +726,9 @@ export default function DayBuilder() {
                       drag={drag}
                       onDragStart={onDragStart}
                       trackRef={ref}
-                      moveLabel={`↔ העבר לאופציה ${other}`}
-                      onMove={moveToOther}
+                      moveLabel={readOnly ? undefined : `↔ העבר לאופציה ${other}`}
+                      onMove={readOnly ? undefined : moveToOther}
+                      readOnly={readOnly}
                     />
                   )}
                 </div>
@@ -718,17 +737,20 @@ export default function DayBuilder() {
           </div>
         ) : items.length === 0 ? (
           <div className="bg-white rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-400">
-            עדיין אין פעילויות. הקלד שם פעילות למעלה כדי להתחיל את הלו״ז.
+            {readOnly ? 'אין פעילויות ביום הזה.' : 'עדיין אין פעילויות. הקלד שם פעילות למעלה כדי להתחיל את הלו״ז.'}
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-slate-200 p-3">
-            <div className="text-xs text-slate-400 mb-2">גרור בלוק מעלה/מטה כדי לקבוע מתי הפעילות מתחילה · לחיצה לעריכה</div>
+            {!readOnly && (
+              <div className="text-xs text-slate-400 mb-2">גרור בלוק מעלה/מטה כדי לקבוע מתי הפעילות מתחילה · לחיצה לעריכה</div>
+            )}
             <ScheduleTrack
               items={items}
               marks={marks}
               drag={drag}
               onDragStart={onDragStart}
               trackRef={trackRef}
+              readOnly={readOnly}
             />
           </div>
         )}
@@ -813,16 +835,18 @@ export default function DayBuilder() {
                         פתח ב-Gmail ↗
                       </a>
                     )}
-                    <button
-                      onClick={() => {
-                        pendingReplyRef.current = mail.message_id || undefined;
-                        draftReply(mail.message_id || undefined);
-                      }}
-                      disabled={draftPending}
-                      className="bg-ocar text-white px-3 py-1.5 rounded-lg font-medium hover:opacity-90 disabled:opacity-60"
-                    >
-                      {draftPending ? 'מכין טיוטה…' : 'השב עם הצעה (ללא מחירים)'}
-                    </button>
+                    {!readOnly && (
+                      <button
+                        onClick={() => {
+                          pendingReplyRef.current = mail.message_id || undefined;
+                          draftReply(mail.message_id || undefined);
+                        }}
+                        disabled={draftPending}
+                        className="bg-ocar text-white px-3 py-1.5 rounded-lg font-medium hover:opacity-90 disabled:opacity-60"
+                      >
+                        {draftPending ? 'מכין טיוטה…' : 'השב עם הצעה (ללא מחירים)'}
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -864,21 +888,25 @@ export default function DayBuilder() {
               <div className="text-xs text-slate-400">מסמכים פנימיים — חוזה, קבלה וכו'</div>
             </div>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={onPickFiles}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="w-full border border-ocar text-ocar px-3 py-2 rounded-lg font-medium hover:bg-ocar-soft disabled:opacity-60"
-          >
-            {uploading ? 'מעלה…' : '+ העלה קובץ'}
-          </button>
+          {!readOnly && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={onPickFiles}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="w-full border border-ocar text-ocar px-3 py-2 rounded-lg font-medium hover:bg-ocar-soft disabled:opacity-60"
+              >
+                {uploading ? 'מעלה…' : '+ העלה קובץ'}
+              </button>
+            </>
+          )}
 
           {(event.files || []).length === 0 ? (
             <p className="text-slate-400 mt-3">אין קבצים עדיין</p>
@@ -902,14 +930,16 @@ export default function DayBuilder() {
                     </a>
                     <div className="text-xs text-slate-400">{fileSize(file.size)}</div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onDeleteFile(file)}
-                    className="flex-shrink-0 text-slate-400 hover:text-red-600"
-                    title="מחק"
-                  >
-                    ✕
-                  </button>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteFile(file)}
+                      className="flex-shrink-0 text-slate-400 hover:text-red-600"
+                      title="מחק"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -917,7 +947,7 @@ export default function DayBuilder() {
         </div>
       </aside>
 
-      {editingItem && (
+      {!readOnly && editingItem && (
         <TimelineItem
           item={editingItem}
           onChange={updateItem}
