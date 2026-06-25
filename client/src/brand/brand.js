@@ -2,9 +2,9 @@
 // Logo: drop the file in /assets/logo and copy to server/assets/ocar-logo.png,
 // then point `logoUrl` at "/brand/ocar-logo.png".
 export const brand = {
-  name: 'Ocar',
+  name: 'star הפקות',
   tagline: 'בונים ימי כיף וימי גיבוש',
-  logoUrl: '/brand/ocar-logo.png',
+  logoUrl: '/brand/star-logo.jpeg',
   // The real mailbox used for replies / opening messages. Forces the right
   // Google account via ?authuser= even when signed into multiple accounts.
   gmailAccount: 'gocarisrael@gmail.com',

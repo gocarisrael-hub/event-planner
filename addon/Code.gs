@@ -1,8 +1,8 @@
 /**
- * Ocar Fun Day — Gmail add-on
+ * star הפקות — Gmail add-on
  *
  * While reading a client's request email, the user can:
- *   1. "צור יום ב-Ocar"  — create a fun day in the hosted app with this email attached.
+ *   1. "צור יום ב-star הפקות"  — create a fun day in the hosted app with this email attached.
  *   2. "השב עם הצעה (ללא מחירים)" — attach a no-prices proposal PDF to a draft reply.
  *
  * The add-on runs AS the user (Apps Script). It reads the current message and
@@ -30,7 +30,7 @@ var GMAIL_ACCOUNT = 'gocarisrael@gmail.com';
 
 // Gmail label applied to threads that already have a fun day, so they are
 // visible as such directly in the inbox list.
-var DAY_LABEL = 'יום ב-Ocar ✅';
+var DAY_LABEL = 'יום ב-star הפקות ✅';
 
 /**
  * Reads BACKEND_URL / ADDON_API_KEY from Script Properties.
@@ -47,7 +47,7 @@ function cfg_() {
     if (!backendUrl) missing.push('BACKEND_URL');
     if (!apiKey) missing.push('ADDON_API_KEY');
     var card = CardService.newCardBuilder()
-      .setHeader(CardService.newCardHeader().setTitle('Ocar Fun Day — הגדרה חסרה'))
+      .setHeader(CardService.newCardHeader().setTitle('star הפקות — הגדרה חסרה'))
       .addSection(
         CardService.newCardSection().addWidget(
           CardService.newTextParagraph().setText(
@@ -102,7 +102,7 @@ function onGmailMessage(e) {
 
   var builder = CardService.newCardBuilder().setHeader(
     CardService.newCardHeader()
-      .setTitle('Ocar Fun Day')
+      .setTitle('star הפקות')
       .setSubtitle('יצירת יום כיף מתוך פניית לקוח')
   );
 
@@ -155,7 +155,7 @@ function onGmailMessage(e) {
     // Insert the banner as the first section, before the info section.
     var bannerBuilder = CardService.newCardBuilder().setHeader(
       CardService.newCardHeader()
-        .setTitle('Ocar Fun Day')
+        .setTitle('star הפקות')
         .setSubtitle('יצירת יום כיף מתוך פניית לקוח')
     );
     bannerBuilder.addSection(banner);
@@ -166,7 +166,7 @@ function onGmailMessage(e) {
   var actions = CardService.newCardSection();
 
   var createBtn = CardService.newTextButton()
-    .setText('צור יום ב-Ocar')
+    .setText('צור יום ב-star הפקות')
     .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
     .setOnClickAction(
       CardService.newAction().setFunctionName('createDay')
@@ -344,7 +344,7 @@ function createDay(e) {
 
   return CardService.newActionResponseBuilder()
     .setNotification(
-      CardService.newNotification().setText('היום נוצר ב-Ocar')
+      CardService.newNotification().setText('היום נוצר ב-star הפקות')
     )
     .setNavigation(CardService.newNavigation().pushCard(card))
     .build();
@@ -462,7 +462,7 @@ function draftReply(e) {
 
   var found = fetchEventByThread_(conf, threadId);
   if (!found || !found.exists || !found.id) {
-    return notify_('יש ליצור קודם יום ב-Ocar (כפתור "צור יום ב-Ocar"), ואז להשיב עם ההצעה.');
+    return notify_('יש ליצור קודם יום ב-star הפקות (כפתור "צור יום ב-star הפקות"), ואז להשיב עם ההצעה.');
   }
 
   var url = conf.backendUrl + '/api/addon/proposal-pdf?event_id=' +
@@ -489,7 +489,7 @@ function draftReply(e) {
     'שלום,<br><br>' +
     'תודה על פנייתכם. מצורפת הצעה ראשונית ליום הכיף.<br>' +
     'נשמח לתאם פרטים ולעדכן בהתאם לצרכים שלכם.<br><br>' +
-    'בברכה,<br>צוות Ocar';
+    'בברכה,<br>צוות star הפקות';
 
   try {
     // createDraftReply is a GmailThread method (not GmailMessage).

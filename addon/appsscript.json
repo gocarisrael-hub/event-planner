@@ -10,8 +10,8 @@
   ],
   "addOns": {
     "common": {
-      "name": "Ocar Fun Day",
-      "logoUrl": "https://server-production-fb4b.up.railway.app/brand/ocar-logo.png"
+      "name": "star הפקות",
+      "logoUrl": "https://server-production-fb4b.up.railway.app/brand/star-logo.jpeg"
     },
     "gmail": {
       "contextualTriggers": [
