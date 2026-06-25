@@ -68,34 +68,12 @@ function cfg_() {
 /* Thread -> event mapping                                             */
 /* ------------------------------------------------------------------ */
 /*
- * After a day is created we remember { event_id, url } keyed by the Gmail
- * thread id, so the reply button knows which event's PDF to fetch. We use
- * Script Properties (durable, shared across the user's sessions) with a
- * namespaced key. (CacheService would expire after ~6h; properties persist.)
+ * Thread→day resolution is done against the backend (fetchEventByThread_),
+ * which is the single source of truth — so deleting a day in the app
+ * immediately stops the add-on from claiming a day exists. (We previously
+ * cached the mapping in Script Properties, but those entries went stale on
+ * delete and produced false "יום קיים" banners.)
  */
-
-function mapKey_(threadId) {
-  return 'thread:' + threadId;
-}
-
-function rememberEvent_(threadId, eventId, url) {
-  if (!threadId) return;
-  PropertiesService.getScriptProperties().setProperty(
-    mapKey_(threadId),
-    JSON.stringify({ event_id: eventId, url: url })
-  );
-}
-
-function lookupEvent_(threadId) {
-  if (!threadId) return null;
-  var raw = PropertiesService.getScriptProperties().getProperty(mapKey_(threadId));
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch (err) {
-    return null;
-  }
-}
 
 /* ------------------------------------------------------------------ */
 /* Message access                                                      */
@@ -121,8 +99,6 @@ function onGmailMessage(e) {
   var subject = message.getSubject() || '(ללא נושא)';
   var from = message.getFrom() || '';
   var threadId = message.getThread().getId();
-
-  var existing = lookupEvent_(threadId);
 
   var builder = CardService.newCardBuilder().setHeader(
     CardService.newCardHeader()
@@ -196,20 +172,6 @@ function onGmailMessage(e) {
       CardService.newAction().setFunctionName('createDay')
     );
   actions.addWidget(createBtn);
-
-  if (existing && existing.url) {
-    actions.addWidget(
-      CardService.newDecoratedText()
-        .setText('יום קיים לשרשור זה')
-        .setBottomLabel('נוצר כבר — אפשר להשיב עם הצעה')
-        .setWrapText(true)
-    );
-    actions.addWidget(
-      CardService.newTextButton()
-        .setText('פתח את היום')
-        .setOpenLink(CardService.newOpenLink().setUrl(existing.url))
-    );
-  }
 
   var replyBtn = CardService.newTextButton()
     .setText('השב עם הצעה (ללא מחירים)')
@@ -354,7 +316,6 @@ function createDay(e) {
     return notify_('השרת לא החזיר מזהה יום.');
   }
 
-  rememberEvent_(thread.getId(), data.event_id, data.url);
   tagThreadAsDay_(message);
 
   // Build a result card with an OpenLink to the new day.
@@ -452,7 +413,6 @@ function linkDay(e) {
     return notify_('השרת לא החזיר מזהה יום.');
   }
 
-  rememberEvent_(thread.getId(), data.event_id, data.url);
   tagThreadAsDay_(message);
 
   var card = CardService.newCardBuilder()
@@ -500,13 +460,13 @@ function draftReply(e) {
   var thread = message.getThread();
   var threadId = thread.getId();
 
-  var mapping = lookupEvent_(threadId);
-  if (!mapping || !mapping.event_id) {
+  var found = fetchEventByThread_(conf, threadId);
+  if (!found || !found.exists || !found.id) {
     return notify_('יש ליצור קודם יום ב-Ocar (כפתור "צור יום ב-Ocar"), ואז להשיב עם ההצעה.');
   }
 
   var url = conf.backendUrl + '/api/addon/proposal-pdf?event_id=' +
-    encodeURIComponent(mapping.event_id);
+    encodeURIComponent(found.id);
 
   var resp;
   try {
