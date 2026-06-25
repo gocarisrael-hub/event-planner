@@ -121,7 +121,9 @@ router.post('/:id/files', fileUpload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'no file uploaded' });
   const file = {
     id: randomUUID(),
-    name: req.file.originalname,
+    // multer/busboy decodes the multipart filename as latin1; re-decode to
+    // utf8 so Hebrew (and other non-ASCII) names aren't mojibake/squares.
+    name: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
     type: req.file.mimetype,
     size: req.file.size,
     url: `/uploads/${req.file.filename}`,
