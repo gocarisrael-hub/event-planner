@@ -341,7 +341,7 @@ router.post('/draft-reply', async (req, res) => {
 מצורפת הצעה ליום שתכננו עבורכם. נשמח לשמוע מחשבות ולתאם המשך.
 
 בברכה,
-צוות Ocar`;
+צוות star הפקות`;
 
   try {
     const raw = buildRawMessage({

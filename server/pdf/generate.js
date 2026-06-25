@@ -1,5 +1,6 @@
 // Render the proposal HTML to a PDF Buffer via headless Puppeteer.
 // A single browser instance is reused across calls.
+import { readFile } from 'node:fs/promises';
 import { dirname, basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Jimp } from 'jimp';
@@ -47,6 +48,20 @@ async function buildPhotoMap(event) {
   return map;
 }
 
+// Read the brand logo from disk and base64-encode it as a data URI. Puppeteer's
+// setContent has no base URL, so the logo must be embedded (not a /brand path).
+// Returns null if the file is missing/unreadable so PDF generation still works.
+const LOGO_PATH = join(__dirname, '..', 'assets', 'star-logo.jpeg');
+
+async function readLogoDataUri() {
+  try {
+    const buf = await readFile(LOGO_PATH);
+    return `data:image/jpeg;base64,${buf.toString('base64')}`;
+  } catch {
+    return null;
+  }
+}
+
 let browserPromise = null;
 
 async function getBrowser() {
@@ -78,12 +93,13 @@ export async function generateProposalPdf(event, { prices } = { prices: false })
   // Pre-resize/encode all photos before rendering so the PDF embeds small
   // JPEGs instead of full-size originals.
   const photos = await buildPhotoMap(event);
+  const logo = await readLogoDataUri();
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
     // 'load' (not 'networkidle0') with a bounded timeout so a slow/unreachable
     // font or image URL can't hang draft-reply indefinitely.
-    await page.setContent(proposalHtml(event, { prices, photos }), { waitUntil: 'load', timeout: 15000 });
+    await page.setContent(proposalHtml(event, { prices, photos, logo }), { waitUntil: 'load', timeout: 15000 });
     const out = await page.pdf({ format: 'A4', printBackground: true });
     // Modern Puppeteer returns a Uint8Array; normalize to a Node Buffer so
     // callers can rely on buffer.toString('base64') etc.

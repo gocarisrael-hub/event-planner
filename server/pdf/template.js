@@ -3,7 +3,7 @@
 // When { prices:false } no prices/totals are rendered (reply PDF is always
 // prices=false).
 const BRAND = {
-  name: 'Ocar',
+  name: 'star הפקות',
   tagline: 'בונים ימי כיף וימי גיבוש',
   primary: '#e00f19',
   dark: '#141414',
@@ -127,8 +127,9 @@ function img(src, cls, photos) {
   return `<img class="${cls}" src="${uri}" alt="" />`;
 }
 
-export function proposalHtml(event, { prices, photos } = { prices: false, photos: {} }) {
+export function proposalHtml(event, { prices, photos, logo } = { prices: false, photos: {}, logo: null }) {
   const photoMap = photos || {};
+  const logoUri = logo || null;
   const items = sortByStart(event.items || []);
   const { low, high } = total(items);
   const showPrices = Boolean(prices);
@@ -246,6 +247,8 @@ export function proposalHtml(event, { prices, photos } = { prices: false, photos
     display: flex; align-items: center; justify-content: space-between;
     border-bottom: 2px solid ${BRAND.primary}; padding-bottom: 16px; margin-bottom: 24px;
   }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo { height: 46px; width: auto; object-fit: contain; }
   .wordmark { font-size: 30px; font-weight: 800; color: ${BRAND.primary}; line-height: 1; }
   .tagline { font-size: 12px; color: #94a3b8; margin-top: 4px; }
   .header-meta { text-align: left; font-size: 13px; color: #64748b; }
@@ -286,9 +289,12 @@ export function proposalHtml(event, { prices, photos } = { prices: false, photos
 <body>
   <div class="page">
     <div class="header">
-      <div>
-        <div class="wordmark">${esc(BRAND.name)}</div>
-        <div class="tagline">${esc(BRAND.tagline)}</div>
+      <div class="brand">
+        ${logoUri ? `<img class="logo" src="${logoUri}" alt="" />` : ''}
+        <div>
+          <div class="wordmark">${esc(BRAND.name)}</div>
+          <div class="tagline">${esc(BRAND.tagline)}</div>
+        </div>
       </div>
       <div class="header-meta">${headerMeta}</div>
     </div>
