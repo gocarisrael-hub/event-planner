@@ -134,11 +134,15 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   const { low, high } = total(items);
   const showPrices = Boolean(prices);
 
-  const headerMeta = [
-    event.client_name ? `<div class="hm-name">${esc(event.client_name)}</div>` : '',
-    whenLabel(event) ? `<div>${esc(whenLabel(event))}</div>` : '',
-    event.group_size ? `<div>${esc(event.group_size)} משתתפים</div>` : '',
-  ].join('');
+  // Middot meta strip under the title: {date} · {N} משתתפים · {location}
+  const metaParts = [
+    whenLabel(event) ? `<bdi>${esc(whenLabel(event))}</bdi>` : '',
+    event.group_size ? `<bdi>${esc(event.group_size)}</bdi> משתתפים` : '',
+    event.location ? esc(event.location) : '',
+  ].filter(Boolean);
+  const metaHtml = metaParts.length
+    ? `<div class="meta">${metaParts.join('<span class="meta-dot">·</span>')}</div>`
+    : '';
 
   const itemsHtml = items.map((it) => {
     const tl = timingLabel(it) || '—';
@@ -156,9 +160,9 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
     if (showPrices) {
       if (hasOptions) {
         const { low: lo, high: hi } = priceRange(it);
-        slotPrice = `<div class="item-price">${esc(formatRange(lo, hi))}</div>`;
+        slotPrice = `<div class="item-price"><bdi>${esc(formatRange(lo, hi))}</bdi></div>`;
       } else if (formatPrice(it.price)) {
-        slotPrice = `<div class="item-price">${esc(formatPrice(it.price))}</div>`;
+        slotPrice = `<div class="item-price"><bdi>${esc(formatPrice(it.price))}</bdi></div>`;
       }
     }
 
@@ -168,7 +172,7 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
     if (hasOptions) {
       const opts = it.options.map((o) => {
         const oPrice = showPrices && formatPrice(o.price)
-          ? `<div class="opt-price">${esc(formatPrice(o.price))}</div>`
+          ? `<div class="opt-price"><bdi>${esc(formatPrice(o.price))}</bdi></div>`
           : '';
         const oPhoto = o.photos?.[0] ? img(o.photos[0], 'opt-photo', photoMap) : '';
         const contact = [o.contact_name, o.contact_phone].filter(Boolean).join(' · ');
@@ -181,7 +185,7 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
                 ${oPrice}
               </div>
               ${o.description ? `<div class="opt-desc">${esc(o.description)}</div>` : ''}
-              ${contact ? `<div class="opt-contact">${esc(contact)}</div>` : ''}
+              ${contact ? `<div class="opt-contact"><span class="contact-label">איש קשר</span> <bdi>${esc(contact)}</bdi></div>` : ''}
             </div>
           </div>`;
       }).join('');
@@ -194,6 +198,7 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
 
     return `
       <div class="item">
+        <span class="dot" aria-hidden="true"></span>
         <div class="item-row">
           <div class="item-time">
             <div class="time-label"><bdi>${esc(tl)}</bdi></div>
@@ -216,12 +221,12 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
       <div class="totals">
         <div class="totals-row">
           <span class="totals-label">מחיר לאדם</span>
-          <span class="totals-value">${esc(formatRange(low, high))}</span>
+          <span class="totals-value"><bdi>${esc(formatRange(low, high))}</bdi></span>
         </div>
         ${event.group_size > 0 ? `
           <div class="totals-group">
-            <span>סה״כ לקבוצה (×${esc(event.group_size)})</span>
-            <span class="totals-group-value">${esc(formatRange(low * event.group_size, high * event.group_size))}</span>
+            <span>סה״כ לקבוצה (×<bdi>${esc(event.group_size)}</bdi>)</span>
+            <span class="totals-group-value"><bdi>${esc(formatRange(low * event.group_size, high * event.group_size))}</bdi></span>
           </div>` : ''}
       </div>`
     : '';
@@ -231,7 +236,12 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   const budgetNum = Number(event.budget);
   const budgetHtml = !showPrices && Number.isFinite(budgetNum) && budgetNum > 0
     ? `
-      <div class="budget">תקציב משוער לאדם: ₪${esc(budgetNum.toLocaleString('he-IL'))}</div>`
+      <div class="totals budget">
+        <div class="totals-row">
+          <span class="totals-label">תקציב משוער לאדם</span>
+          <span class="totals-value"><bdi>₪${esc(budgetNum.toLocaleString('he-IL'))}</bdi></span>
+        </div>
+      </div>`
     : '';
 
   return `<!DOCTYPE html>
@@ -241,61 +251,118 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&family=Frank+Ruhl+Libre:wght@500;700&display=swap" rel="stylesheet" />
 <title>${esc(event.title || 'הצעה')}</title>
 <style>
+  :root {
+    --brand:#e00f19; --brand-wash:#fdecec;
+    --ink:#141414; --ink-2:#3f3f43; --ink-3:#6b6b70; --ink-4:#9a9aa0;
+    --line:#e9e9ec; --line-2:#f3f3f5; --panel:#fafafa;
+  }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
     font-family: 'Heebo', system-ui, Arial, sans-serif;
-    color: ${BRAND.dark};
+    color: var(--ink-2);
     background: #fff;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .page { max-width: 760px; margin: 0 auto; background: #fff; padding: 40px; }
+  bdi { font-variant-numeric: tabular-nums; }
+  .page { max-width: 760px; margin: 0 auto; background: #fff; padding: 44px 40px; }
+
+  /* --- Header: black ink wordmark + a single small red "signature" tick --- */
   .header {
     display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 2px solid ${BRAND.primary}; padding-bottom: 16px; margin-bottom: 24px;
+    border-bottom: 1px solid var(--line); padding-bottom: 18px; margin-bottom: 28px;
   }
   .brand { display: flex; align-items: center; gap: 12px; }
   .logo { height: 46px; width: auto; object-fit: contain; }
-  .wordmark { font-size: 30px; font-weight: 800; color: ${BRAND.primary}; line-height: 1; }
-  .tagline { font-size: 12px; color: #94a3b8; margin-top: 4px; }
-  .header-meta { text-align: left; font-size: 13px; color: #64748b; }
-  .header-meta .hm-name { font-weight: 600; color: #334155; }
-  h1.title { font-size: 28px; font-weight: 800; color: ${BRAND.dark}; margin: 0 0 8px; }
-  h2.sched { font-size: 18px; font-weight: 700; color: ${BRAND.primary}; margin: 0 0 12px; }
-  .item { border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 12px; page-break-inside: avoid; }
+  .wordmark {
+    font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1.05;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .tick { display: inline-block; width: 18px; height: 3px; border-radius: 2px; background: var(--brand); }
+  .tagline { font-size: 11px; color: var(--ink-4); margin-top: 5px; letter-spacing: .02em; }
+
+  /* --- Title + middot meta strip --- */
+  .title {
+    font-family: 'Frank Ruhl Libre', 'Heebo', serif;
+    font-size: 30px; font-weight: 700; color: var(--ink); margin: 0 0 8px; line-height: 1.15;
+  }
+  .meta { font-size: 13px; color: var(--ink-3); margin: 0 0 26px; }
+  .meta-dot { color: var(--ink-4); margin: 0 8px; }
+
+  .sched {
+    font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-3); margin: 0 0 16px;
+  }
+
+  /* --- Timeline: hairline spine on the start (RTL-right) edge + red dots --- */
+  .items { position: relative; }
+  .items::before {
+    content: ""; position: absolute; top: 6px; bottom: 6px;
+    inset-inline-start: 5px; width: 2px; background: var(--line);
+  }
+  .item {
+    position: relative; padding-inline-start: 26px;
+    padding-bottom: 18px; margin-bottom: 18px;
+    border-bottom: 1px solid var(--line-2); page-break-inside: avoid;
+  }
+  .item:last-child { border-bottom: 0; margin-bottom: 0; }
+  .dot {
+    position: absolute; inset-inline-start: 0; top: 5px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--brand); box-shadow: 0 0 0 3px #fff, 0 0 0 4px var(--line);
+  }
   .item-row { display: flex; gap: 16px; align-items: flex-start; }
-  .item-time { min-width: 90px; text-align: center; }
-  .time-label { font-weight: 700; color: ${BRAND.primary}; }
-  .time-dur { font-size: 12px; color: #94a3b8; }
-  .item-photo { height: 80px; width: 96px; border-radius: 8px; object-fit: cover; }
-  .item-main { flex: 1; }
-  .item-title { font-weight: 600; }
-  .item-desc { font-size: 13px; color: #64748b; word-break: break-word; }
-  .item-contact { font-size: 12px; color: #94a3b8; margin-top: 4px; }
-  .item-price { font-size: 13px; font-weight: 500; white-space: nowrap; }
-  .options { margin-top: 12px; padding-right: 106px; }
-  .options-label { font-size: 12px; font-weight: 500; color: #94a3b8; margin-bottom: 8px; }
+  .item-time { min-width: 78px; }
+  .time-label { font-size: 15px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .time-dur { font-size: 11px; color: var(--ink-4); margin-top: 2px; }
+  .item-photo {
+    height: 80px; width: 120px; border-radius: 10px; object-fit: cover; flex-shrink: 0;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
+  }
+  .item-main { flex: 1; min-width: 0; }
+  .item-title { font-size: 16px; font-weight: 600; color: var(--ink); }
+  .item-desc { font-size: 13px; line-height: 1.6; color: var(--ink-2); word-break: break-word; margin-top: 3px; }
+  .item-contact { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+  .contact-label { font-size: 10.5px; letter-spacing: .04em; color: var(--ink-4); }
+  .item-price { font-size: 13px; font-weight: 600; white-space: nowrap; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* --- Options / choice block --- */
+  .options { margin-top: 14px; padding-inline-start: 94px; }
+  .options-label { font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--ink-4); margin-bottom: 8px; }
   .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .opt { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; gap: 12px; }
-  .opt-photo { height: 64px; width: 64px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+  .opt { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; gap: 12px; background: var(--panel); }
+  .opt-photo {
+    height: 64px; width: 64px; border-radius: 10px; object-fit: cover; flex-shrink: 0;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
+  }
   .opt-body { flex: 1; min-width: 0; }
   .opt-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-  .opt-title { font-weight: 600; }
-  .opt-price { font-size: 13px; font-weight: 500; white-space: nowrap; }
-  .opt-desc { font-size: 13px; color: #64748b; word-break: break-word; }
-  .opt-contact { font-size: 12px; color: #94a3b8; margin-top: 4px; }
-  .totals { margin-top: 24px; padding-top: 16px; border-top: 2px solid ${BRAND.primary}; }
-  .totals-row { display: flex; justify-content: space-between; align-items: center; }
-  .totals-label { font-weight: 700; font-size: 18px; }
-  .totals-value { font-weight: 800; font-size: 18px; color: ${BRAND.primary}; }
-  .totals-group { display: flex; justify-content: space-between; align-items: center; color: #64748b; margin-top: 4px; }
-  .totals-group-value { font-weight: 500; }
-  .budget { margin-top: 24px; padding-top: 16px; border-top: 2px solid ${BRAND.primary}; font-weight: 700; font-size: 16px; color: ${BRAND.dark}; }
-  .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #94a3b8; }
+  .opt-title { font-weight: 600; color: var(--ink); }
+  .opt-price { font-size: 13px; font-weight: 600; white-space: nowrap; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .opt-desc { font-size: 13px; line-height: 1.6; color: var(--ink-2); word-break: break-word; margin-top: 2px; }
+  .opt-contact { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+
+  /* --- Totals / budget band: soft-red wash, 2px red top edge, red value --- */
+  .totals {
+    margin-top: 28px; padding: 16px 18px; border-radius: 12px;
+    background: var(--brand-wash); border-top: 2px solid var(--brand);
+    page-break-inside: avoid;
+  }
+  .totals-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .totals-label { font-weight: 700; font-size: 15px; color: var(--ink); }
+  .totals-value { font-weight: 800; font-size: 20px; color: var(--brand); font-variant-numeric: tabular-nums; }
+  .totals-group { display: flex; justify-content: space-between; align-items: baseline; color: var(--ink-3); font-size: 13px; margin-top: 8px; }
+  .totals-group-value { font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+  /* --- Footer: slim, centered, hairline above --- */
+  .footer {
+    margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line);
+    text-align: center; font-size: 10px; color: var(--ink-4); letter-spacing: .02em;
+  }
 </style>
 </head>
 <body>
@@ -304,16 +371,16 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
       <div class="brand">
         ${logoUri ? `<img class="logo" src="${logoUri}" alt="" />` : ''}
         <div>
-          <div class="wordmark">${esc(BRAND.name)}</div>
+          <div class="wordmark"><span class="tick" aria-hidden="true"></span>${esc(BRAND.name)}</div>
           <div class="tagline">${esc(BRAND.tagline)}</div>
         </div>
       </div>
-      <div class="header-meta">${headerMeta}</div>
     </div>
 
     <h1 class="title">${esc(event.title || '')}</h1>
+    ${metaHtml}
 
-    <h2 class="sched">הלו״ז ליום</h2>
+    <div class="sched">הלו״ז ליום</div>
     <div class="items">${itemsHtml}</div>
 
     ${totalsHtml}
