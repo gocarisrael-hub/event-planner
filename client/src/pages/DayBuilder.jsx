@@ -6,6 +6,7 @@ import AddActivityRow from '../components/AddActivityRow.jsx';
 import BudgetMeter from '../components/BudgetMeter.jsx';
 import DatePicker from '../components/DatePicker.jsx';
 import TimelineItem from '../components/TimelineItem.jsx';
+import StatusSelect from '../components/StatusSelect.jsx';
 import { useCatalogStore } from '../store/useCatalogStore.js';
 import { useEventStore } from '../store/useEventStore.js';
 import { formatPrice, formatRange, MONTHS, SEASONS, timingLabel, whenLabel } from '../utils/format.js';
@@ -532,7 +533,10 @@ export default function DayBuilder() {
       <div>
         <Link to="/" className="text-sm text-slate-400 hover:text-ocar">← הימים שלי</Link>
         <div className="flex items-start justify-between gap-3 mt-1 mb-1">
-          <h1 className="text-2xl font-bold">{event.title}</h1>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl font-bold">{event.title}</h1>
+            <StatusSelect value={event.status} onChange={(s) => updateEvent({ status: s })} />
+          </div>
           <button
             type="button"
             onClick={() => setEditDay((v) => !v)}
