@@ -9,7 +9,7 @@ import TimelineItem from '../components/TimelineItem.jsx';
 import StatusSelect from '../components/StatusSelect.jsx';
 import { useCatalogStore } from '../store/useCatalogStore.js';
 import { useEventStore } from '../store/useEventStore.js';
-import { formatPrice, formatRange, MONTHS, SEASONS, timingLabel, whenLabel } from '../utils/format.js';
+import { formatPrice, formatRange, MONTHS, SEASONS, timingLabel, total, whenLabel } from '../utils/format.js';
 import {
   DAY_START_MIN,
   DAY_END_MIN,
@@ -61,7 +61,7 @@ function choiceRange(item, options) {
 
 // A positioned, draggable block on the timeline. Dragging changes the item's
 // start time (vertical only, snapped + clamped); clicking opens the editor.
-function TimelineBlock({ item, onDragStart, onClick, dragging, top }) {
+function TimelineBlock({ item, onDragStart, onClick, dragging, top, moveLabel, onMove }) {
   const options = item.options || [];
   const hasOptions = options.length > 0;
   const height = durationToHeight(item.approx_duration_hours);
@@ -114,6 +114,21 @@ function TimelineBlock({ item, onDragStart, onClick, dragging, top }) {
         <div className="text-[11px] text-ocar-dark/80 whitespace-nowrap flex-shrink-0">
           {hasOptions ? formatRange(range.low, range.high) : formatPrice(item.price) || ''}
         </div>
+        {onMove && (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onMove(item);
+            }}
+            className="flex-shrink-0 text-[10px] leading-none bg-white/80 text-ocar rounded-full px-1.5 py-1 hover:bg-white border border-ocar/30"
+            title={moveLabel}
+          >
+            {moveLabel}
+          </button>
+        )}
       </div>
       {/* Description: only when at least one whole line fits; clamped, "…". */}
       {showDesc && (
@@ -131,6 +146,46 @@ function TimelineBlock({ item, onDragStart, onClick, dragging, top }) {
           {item.description}
         </div>
       )}
+    </div>
+  );
+}
+
+// A single timeline track: hour rails on the right (RTL) and positioned,
+// draggable activity blocks. Used once in single mode and twice (one per
+// option) in two-option mode. Each instance gets its own `trackRef` so the
+// container is independent; drag math itself is pointer-delta based and works
+// per-block regardless of which column it lives in.
+function ScheduleTrack({ items, marks, drag, onDragStart, trackRef, moveLabel, onMove }) {
+  return (
+    <div ref={trackRef} className="relative" style={{ height: TRACK_PX, paddingRight: 56 }}>
+      {marks.map((m) => (
+        <div key={m.hour} className="absolute left-0 right-0" style={{ top: m.top }}>
+          <div className="absolute right-0 -translate-y-1/2 text-[11px] text-slate-400 w-12 text-center tabular-nums">
+            {m.label}
+          </div>
+          <div className="absolute left-0 right-14 border-t border-slate-100" />
+        </div>
+      ))}
+      {/* Activity blocks */}
+      <div className="absolute inset-y-0 left-0" style={{ right: 56 }}>
+        {items.map((item) => {
+          const isDrag = drag && drag.id === item.id;
+          const startMin = startToMinutes(item.approx_start) ?? DAY_START_MIN;
+          const top = isDrag ? drag.top : minutesToTop(startMin);
+          return (
+            <TimelineBlock
+              key={item.id}
+              item={item}
+              top={top}
+              dragging={isDrag}
+              onDragStart={onDragStart}
+              onClick={(e) => e.preventDefault()}
+              moveLabel={moveLabel}
+              onMove={onMove}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -293,7 +348,9 @@ export default function DayBuilder() {
   // drag happened (to suppress the click-to-edit on release).
   const [drag, setDrag] = useState(null); // { id, top }
   const dragRef = useRef(null); // { id, startY, startTop, dur, moved }
-  const trackRef = useRef(null);
+  const trackRef = useRef(null); // single-mode track container
+  const trackRefA = useRef(null); // two-option mode: option-A track container
+  const trackRefB = useRef(null); // two-option mode: option-B track container
 
   // Reset the one-time seeding flag whenever we switch to a different day,
   // so legacy items on the newly-loaded day also get positioned.
@@ -378,9 +435,11 @@ export default function DayBuilder() {
   if (loading || !event) return <p className="text-slate-400">טוען…</p>;
 
   // First free slot after the latest existing block's end (or 07:00 if none).
-  const nextFreeStart = () => {
+  // In two-option mode each column stacks independently, so pass that column's
+  // item list to compute its own next slot.
+  const nextFreeStart = (list = items) => {
     let latestEnd = DAY_START_MIN;
-    for (const it of items) {
+    for (const it of list) {
       const s = startToMinutes(it.approx_start);
       if (s === null) continue;
       const end = s + Math.round((it.approx_duration_hours || DEFAULT_DURATION) * 60);
@@ -389,14 +448,23 @@ export default function DayBuilder() {
     return clampMin(latestEnd, DEFAULT_DURATION);
   };
 
-  const onAdd = async (data) => {
-    const startMin = nextFreeStart();
+  // Add an item, optionally pinned to a specific A/B option (two-option mode).
+  const onAdd = (option) => async (data) => {
+    const list = option ? items.filter((i) => (i.option || 'A') === option) : items;
+    const startMin = nextFreeStart(list);
     await addItem({
       approx_duration_hours: DEFAULT_DURATION,
+      ...(option ? { option } : {}),
       ...data,
       approx_start: minutesToStart(startMin),
     });
     if (!data.from_catalog_id) refreshCatalog(); // new activity landed in the catalog
+  };
+
+  // Move an item to the other option (two-option mode only).
+  const moveToOther = (item) => {
+    const next = (item.option || 'A') === 'A' ? 'B' : 'A';
+    updateItem(item.id, { option: next });
   };
 
   // --- Pointer drag (vertical only) ----------------------------------------
@@ -559,9 +627,30 @@ export default function DayBuilder() {
           />
         )}
 
-        <div className="mb-4">
-          <AddActivityRow onAdd={onAdd} />
+        {/* Two-options toggle: flip the day between a single schedule and two
+            side-by-side A/B options. */}
+        <div className="mb-4 flex items-center justify-between gap-3 bg-white rounded-xl border border-slate-200 p-3">
+          <div>
+            <div className="font-medium text-sm">תכנון אופציות</div>
+            <div className="text-xs text-slate-400">
+              {event.options_mode ? 'מתכננים שתי אופציות זו לצד זו' : 'תכנון יום בודד'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => updateEvent({ options_mode: !event.options_mode })}
+            className="flex-shrink-0 text-sm border border-ocar text-ocar rounded-lg px-3 py-1.5 font-medium hover:bg-ocar-soft"
+          >
+            {event.options_mode ? 'אופציה אחת' : 'תכנן 2 אופציות'}
+          </button>
         </div>
+
+        {/* Single-mode add row. In two-option mode each column has its own. */}
+        {!event.options_mode && (
+          <div className="mb-4">
+            <AddActivityRow onAdd={onAdd()} />
+          </div>
+        )}
 
         {/* Private notes — never shown in the client proposal/PDF. Full-width
             at the top of the main column for a larger, more comfortable area. */}
@@ -587,42 +676,60 @@ export default function DayBuilder() {
           />
         </div>
 
-        {items.length === 0 ? (
+        {event.options_mode ? (
+          // --- Two options, side by side -------------------------------------
+          <div className="grid md:grid-cols-2 gap-4">
+            {[
+              { opt: 'A', label: 'אופציה א', other: 'ב', ref: trackRefA },
+              { opt: 'B', label: 'אופציה ב', other: 'א', ref: trackRefB },
+            ].map(({ opt, label, other, ref }) => {
+              const colItems = items.filter((i) => (i.option || 'A') === opt);
+              const { low, high } = total(colItems);
+              return (
+                <div key={opt} className="bg-white rounded-xl border border-slate-200 p-3">
+                  <div className="font-semibold text-ocar-dark mb-2">{label}</div>
+                  <div className="mb-3">
+                    <AddActivityRow onAdd={onAdd(opt)} />
+                  </div>
+                  <div className="flex items-center justify-between text-xs mb-2">
+                    <span className="text-slate-400">גרור בלוק לקביעת שעה · לחיצה לעריכה</span>
+                    <span className="font-medium text-ocar-dark">
+                      {high > 0 ? formatRange(low, high) : '—'}
+                    </span>
+                  </div>
+                  {colItems.length === 0 ? (
+                    <div className="border border-dashed border-slate-300 rounded-lg p-6 text-center text-slate-400 text-sm">
+                      אין פעילויות ב{label}
+                    </div>
+                  ) : (
+                    <ScheduleTrack
+                      items={colItems}
+                      marks={marks}
+                      drag={drag}
+                      onDragStart={onDragStart}
+                      trackRef={ref}
+                      moveLabel={`↔ העבר לאופציה ${other}`}
+                      onMove={moveToOther}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : items.length === 0 ? (
           <div className="bg-white rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-400">
             עדיין אין פעילויות. הקלד שם פעילות למעלה כדי להתחיל את הלו״ז.
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-slate-200 p-3">
             <div className="text-xs text-slate-400 mb-2">גרור בלוק מעלה/מטה כדי לקבוע מתי הפעילות מתחילה · לחיצה לעריכה</div>
-            {/* Track: hour labels on the right (RTL), blocks fill the rest. */}
-            <div ref={trackRef} className="relative" style={{ height: TRACK_PX, paddingRight: 56 }}>
-              {marks.map((m) => (
-                <div key={m.hour} className="absolute left-0 right-0" style={{ top: m.top }}>
-                  <div className="absolute right-0 -translate-y-1/2 text-[11px] text-slate-400 w-12 text-center tabular-nums">
-                    {m.label}
-                  </div>
-                  <div className="absolute left-0 right-14 border-t border-slate-100" />
-                </div>
-              ))}
-              {/* Activity blocks */}
-              <div className="absolute inset-y-0 left-0" style={{ right: 56 }}>
-                {items.map((item) => {
-                  const isDrag = drag && drag.id === item.id;
-                  const startMin = startToMinutes(item.approx_start) ?? DAY_START_MIN;
-                  const top = isDrag ? drag.top : minutesToTop(startMin);
-                  return (
-                    <TimelineBlock
-                      key={item.id}
-                      item={item}
-                      top={top}
-                      dragging={isDrag}
-                      onDragStart={onDragStart}
-                      onClick={(e) => e.preventDefault()}
-                    />
-                  );
-                })}
-              </div>
-            </div>
+            <ScheduleTrack
+              items={items}
+              marks={marks}
+              drag={drag}
+              onDragStart={onDragStart}
+              trackRef={trackRef}
+            />
           </div>
         )}
       </div>

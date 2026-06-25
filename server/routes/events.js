@@ -49,6 +49,7 @@ router.post('/', (req, res) => {
     target_month: b.target_month || null,
     target_season: b.target_season || null,
     status: 'draft',
+    options_mode: b.options_mode === true,
     cover_photo: null,
     email: null,
     notes: b.notes || '',
@@ -205,6 +206,7 @@ router.post('/:id/items', (req, res) => {
   const item = items.insert({
     event_id: event.id,
     order_index,
+    option: b.option === 'B' ? 'B' : 'A',
     approx_start: b.approx_start || null,
     time_note: b.time_note || '',
     notes: b.notes || '',

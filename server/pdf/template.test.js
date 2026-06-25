@@ -85,6 +85,52 @@ test('goal budget NOT shown when budget is missing or non-positive', () => {
   }
 });
 
+test('options_mode:true renders both A and B section headers with their items', () => {
+  const event = {
+    title: 'יום',
+    options_mode: true,
+    items: [
+      { title: 'פעילות איי', option: 'A', approx_start: '09:00' },
+      { title: 'פעילות בי', option: 'B', approx_start: '10:00' },
+    ],
+  };
+  const html = proposalHtml(event, { prices: false, photos: {}, logo: null });
+  assert.ok(html.includes('אופציה א'), 'expected option A header');
+  assert.ok(html.includes('אופציה ב'), 'expected option B header');
+  assert.ok(html.includes('פעילות איי'), 'expected A item under its section');
+  assert.ok(html.includes('פעילות בי'), 'expected B item under its section');
+});
+
+test('options_mode:true shows a per-option total under each option when prices on', () => {
+  const event = {
+    title: 'יום',
+    options_mode: true,
+    group_size: 10,
+    items: [
+      { title: 'A', option: 'A', price: 100 },
+      { title: 'B', option: 'B', price: 200 },
+    ],
+  };
+  const html = proposalHtml(event, { prices: true, photos: {}, logo: null });
+  assert.ok(html.includes('מחיר לאדם · אופציה א'), 'expected per-option A total label');
+  assert.ok(html.includes('מחיר לאדם · אופציה ב'), 'expected per-option B total label');
+  assert.ok(html.includes('₪100'), 'expected A total value');
+  assert.ok(html.includes('₪200'), 'expected B total value');
+});
+
+test('options_mode:false (or absent) renders single schedule, no A/B labels', () => {
+  for (const event of [
+    { title: 'יום', items: [{ title: 'פעילות', option: 'A' }] },
+    { title: 'יום', options_mode: false, items: [{ title: 'פעילות', option: 'A' }] },
+  ]) {
+    const html = proposalHtml(event, { prices: false, photos: {}, logo: null });
+    assert.ok(!html.includes('אופציה א'), 'no option A label in single mode');
+    assert.ok(!html.includes('אופציה ב'), 'no option B label in single mode');
+    assert.ok(html.includes('פעילות'), 'item still renders in single mode');
+    assert.ok(html.includes('הלו״ז ליום'), 'single schedule header present');
+  }
+});
+
 test('requests text never appears in the PDF', () => {
   const html = proposalHtml(
     { title: 'א', requests: 'אנחנו רוצים משהו מיוחד', items: [] },

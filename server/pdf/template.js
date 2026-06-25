@@ -127,24 +127,9 @@ function img(src, cls, photos) {
   return `<img class="${cls}" src="${uri}" alt="" />`;
 }
 
-export function proposalHtml(event, { prices, photos, logo } = { prices: false, photos: {}, logo: null }) {
-  const photoMap = photos || {};
-  const logoUri = logo || null;
-  const items = sortByStart(event.items || []);
-  const { low, high } = total(items);
-  const showPrices = Boolean(prices);
-
-  // Middot meta strip under the title: {date} · {N} משתתפים · {location}
-  const metaParts = [
-    whenLabel(event) ? `<bdi>${esc(whenLabel(event))}</bdi>` : '',
-    event.group_size ? `<bdi>${esc(event.group_size)}</bdi> משתתפים` : '',
-    event.location ? esc(event.location) : '',
-  ].filter(Boolean);
-  const metaHtml = metaParts.length
-    ? `<div class="meta">${metaParts.join('<span class="meta-dot">·</span>')}</div>`
-    : '';
-
-  const itemsHtml = items.map((it) => {
+// Render one schedule item's HTML block. Shared by single- and two-option
+// modes so the activity-block markup stays identical everywhere.
+function itemHtml(it, { showPrices, photoMap }) {
     const tl = timingLabel(it) || '—';
     const dur = formatDuration(it.approx_duration_hours);
     const hasOptions = it.options?.length > 0;
@@ -214,25 +199,80 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
         </div>
         ${optionsHtml}
       </div>`;
-  }).join('');
+}
 
-  const totalsHtml = showPrices && high > 0
-    ? `
+// The totals band (per-person + group) for a given price range. Only rendered
+// by the caller when showPrices and high > 0.
+function totalsBand(low, high, groupSize, label = 'מחיר לאדם') {
+  return `
       <div class="totals">
         <div class="totals-row">
-          <span class="totals-label">מחיר לאדם</span>
+          <span class="totals-label">${esc(label)}</span>
           <span class="totals-value"><bdi>${esc(formatRange(low, high))}</bdi></span>
         </div>
-        ${event.group_size > 0 ? `
+        ${groupSize > 0 ? `
           <div class="totals-group">
-            <span>סה״כ לקבוצה (×<bdi>${esc(event.group_size)}</bdi>)</span>
-            <span class="totals-group-value"><bdi>${esc(formatRange(low * event.group_size, high * event.group_size))}</bdi></span>
+            <span>סה״כ לקבוצה (×<bdi>${esc(groupSize)}</bdi>)</span>
+            <span class="totals-group-value"><bdi>${esc(formatRange(low * groupSize, high * groupSize))}</bdi></span>
           </div>` : ''}
-      </div>`
+      </div>`;
+}
+
+// One schedule section: its items (sorted by start) plus, when prices are on,
+// its own totals band. Used per-option in two-option mode, and once overall in
+// single mode (with no section header).
+function scheduleSection(rawItems, { showPrices, photoMap, groupSize, totalsLabel }) {
+  const items = sortByStart(rawItems);
+  const itemsHtml = items.map((it) => itemHtml(it, { showPrices, photoMap })).join('');
+  const { low, high } = total(items);
+  const totalsHtml = showPrices && high > 0
+    ? totalsBand(low, high, groupSize, totalsLabel)
     : '';
+  return `<div class="items">${itemsHtml}</div>${totalsHtml}`;
+}
+
+export function proposalHtml(event, { prices, photos, logo } = { prices: false, photos: {}, logo: null }) {
+  const photoMap = photos || {};
+  const logoUri = logo || null;
+  const showPrices = Boolean(prices);
+  const allItems = event.items || [];
+  const optionsMode = event.options_mode === true;
+  const groupSize = event.group_size > 0 ? event.group_size : 0;
+
+  // Middot meta strip under the title: {date} · {N} משתתפים · {location}
+  const metaParts = [
+    whenLabel(event) ? `<bdi>${esc(whenLabel(event))}</bdi>` : '',
+    event.group_size ? `<bdi>${esc(event.group_size)}</bdi> משתתפים` : '',
+    event.location ? esc(event.location) : '',
+  ].filter(Boolean);
+  const metaHtml = metaParts.length
+    ? `<div class="meta">${metaParts.join('<span class="meta-dot">·</span>')}</div>`
+    : '';
+
+  // Body: single schedule (unchanged) OR two stacked, labeled option sections.
+  let bodyHtml;
+  if (optionsMode) {
+    const aItems = allItems.filter((it) => it.option !== 'B');
+    const bItems = allItems.filter((it) => it.option === 'B');
+    bodyHtml = `
+      <div class="sched">הלו״ז ליום</div>
+      <div class="option-section">
+        <div class="option-head">אופציה א</div>
+        ${scheduleSection(aItems, { showPrices, photoMap, groupSize, totalsLabel: 'מחיר לאדם · אופציה א' })}
+      </div>
+      <div class="option-section">
+        <div class="option-head">אופציה ב</div>
+        ${scheduleSection(bItems, { showPrices, photoMap, groupSize, totalsLabel: 'מחיר לאדם · אופציה ב' })}
+      </div>`;
+  } else {
+    bodyHtml = `
+      <div class="sched">הלו״ז ליום</div>
+      ${scheduleSection(allItems, { showPrices, photoMap, groupSize })}`;
+  }
 
   // When prices are hidden, surface the planned per-person goal budget instead
   // of real totals. event.budget is already a per-person ("לראש") figure.
+  // Option-independent → shown once at the end in both modes.
   const budgetNum = Number(event.budget);
   const budgetHtml = !showPrices && Number.isFinite(budgetNum) && budgetNum > 0
     ? `
@@ -358,6 +398,16 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   .totals-group { display: flex; justify-content: space-between; align-items: baseline; color: var(--ink-3); font-size: 13px; margin-top: 8px; }
   .totals-group-value { font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 
+  /* --- A/B option sections: stacked, each with a labeled header band --- */
+  .option-section { margin-bottom: 36px; }
+  .option-section:last-of-type { margin-bottom: 0; }
+  .option-head {
+    font-family: 'Frank Ruhl Libre', 'Heebo', serif;
+    font-size: 20px; font-weight: 700; color: var(--ink);
+    padding: 8px 14px; margin: 0 0 18px; border-radius: 10px;
+    background: var(--brand-wash); border-inline-start: 4px solid var(--brand);
+  }
+
   /* --- Footer: slim, centered, hairline above --- */
   .footer {
     margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line);
@@ -380,10 +430,8 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
     <h1 class="title">${esc(event.title || '')}</h1>
     ${metaHtml}
 
-    <div class="sched">הלו״ז ליום</div>
-    <div class="items">${itemsHtml}</div>
+    ${bodyHtml}
 
-    ${totalsHtml}
     ${budgetHtml}
 
     <div class="footer">${esc(BRAND.name)} · ${esc(BRAND.tagline)}</div>

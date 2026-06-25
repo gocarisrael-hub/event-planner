@@ -163,10 +163,20 @@ function migrate(d) {
       ev.status = 'draft';
       changed = true;
     }
+    // A/B options planning: existing days default to single-option mode.
+    if (typeof ev.options_mode !== 'boolean') {
+      ev.options_mode = false;
+      changed = true;
+    }
   }
   for (const it of d.items || []) {
     if (!Array.isArray(it.options)) {
       it.options = [];
+      changed = true;
+    }
+    // A/B options planning: existing items belong to option A by default.
+    if (it.option !== 'A' && it.option !== 'B') {
+      it.option = 'A';
       changed = true;
     }
     if ('price_min' in it || 'price_max' in it) {
