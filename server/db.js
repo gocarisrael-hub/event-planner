@@ -90,8 +90,13 @@ function migrate(d) {
     }
   }
   for (const ev of d.events || []) {
-    if (!('email' in ev)) {
-      ev.email = null;
+    // Migrate the legacy singular `email` to an `emails` array.
+    if (!Array.isArray(ev.emails)) {
+      ev.emails = ev.email ? [ev.email] : [];
+      changed = true;
+    }
+    if ('email' in ev) {
+      delete ev.email;
       changed = true;
     }
     if (!('notes' in ev)) {

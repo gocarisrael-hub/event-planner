@@ -242,7 +242,7 @@ router.post('/create-day', async (req, res) => {
     target_season: null,
     status: 'draft',
     cover_photo: null,
-    email: meta,
+    emails: [meta],
     created_at: now(),
     updated_at: now(),
   });
@@ -302,11 +302,17 @@ router.post('/draft-reply', async (req, res) => {
 
   const event = events.find(eventId);
   if (!event) return res.status(404).json({ error: 'event not found' });
-  if (!event.email || !event.email.thread_id) {
+  const emails = Array.isArray(event.emails) ? event.emails : [];
+  if (emails.length === 0) {
     return res
       .status(400)
       .json({ error: 'no_linked_email', message: 'לאירוע אין מייל מקושר' });
   }
+  // Resolve the target mail: the one whose message_id matches, else the latest.
+  const requestedId = req.body?.message_id;
+  const target =
+    (requestedId && emails.find((m) => m.message_id === requestedId)) ||
+    emails[emails.length - 1];
 
   let gmail;
   try {
@@ -325,11 +331,11 @@ router.post('/draft-reply', async (req, res) => {
       .json({ error: 'pdf_unavailable', message: String(err.message || err) });
   }
 
-  const origSubject = event.email.subject || '';
+  const origSubject = target.subject || '';
   const subject = origSubject.toLowerCase().startsWith('re:')
     ? origSubject
     : `Re: ${origSubject}`.trim();
-  const to = event.email.from || '';
+  const to = target.from || '';
   const bodyText = `שלום,
 
 מצורפת הצעה ליום שתכננו עבורכם. נשמח לשמוע מחשבות ולתאם המשך.
@@ -344,14 +350,14 @@ router.post('/draft-reply', async (req, res) => {
       bodyText,
       pdfBuffer,
       pdfFilename: 'הצעה.pdf',
-      inReplyTo: event.email.message_id,
+      inReplyTo: target.message_id,
     });
     const draft = await gmail.users.drafts.create({
       userId: 'me',
       requestBody: {
         message: {
           raw,
-          threadId: event.email.thread_id,
+          threadId: target.thread_id,
         },
       },
     });

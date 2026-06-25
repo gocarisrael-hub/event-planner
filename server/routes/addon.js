@@ -54,7 +54,7 @@ router.post('/create-day', (req, res) => {
     target_season: null,
     status: 'draft',
     cover_photo: null,
-    email,
+    emails: [email],
     created_at: now(),
     updated_at: now(),
   });
@@ -106,7 +106,15 @@ router.post('/link-day', (req, res) => {
     snippet: b.snippet || '',
     body: b.body || '',
   };
-  events.update(event.id, { email, updated_at: now() });
+  // Append to the day's emails, deduping by message_id (or thread_id).
+  const existing = Array.isArray(event.emails) ? event.emails : [];
+  const isDup = existing.some(
+    (e) =>
+      (email.message_id && e.message_id === email.message_id) ||
+      (email.thread_id && e.thread_id === email.thread_id),
+  );
+  const emails = isDup ? existing : [...existing, email];
+  events.update(event.id, { emails, updated_at: now() });
   const base = process.env.APP_BASE_URL || '';
   res.status(201).json({ event_id: event.id, url: `${base}/day/${event.id}` });
 });
@@ -116,7 +124,7 @@ router.get('/event-by-thread', (req, res) => {
   const threadId = req.query.thread_id;
   if (!threadId) return res.json({ exists: false });
   const matches = events
-    .where((e) => e.email && e.email.thread_id === threadId)
+    .where((e) => (e.emails || []).some((m) => m.thread_id === threadId))
     .slice()
     .sort((a, b) =>
       String(b.updated_at || b.created_at || '').localeCompare(
@@ -136,7 +144,7 @@ router.get('/proposal-pdf', async (req, res) => {
   if (eventId) {
     event = events.find(eventId);
   } else if (threadId) {
-    event = events.where((e) => e.email && e.email.thread_id === threadId)[0] || null;
+    event = events.where((e) => (e.emails || []).some((m) => m.thread_id === threadId))[0] || null;
   }
   if (!event) return res.status(404).json({ error: 'not found' });
 

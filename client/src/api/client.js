@@ -65,7 +65,8 @@ export const api = {
   gmailMessages: (max = 25) => req('GET', `/api/gmail/messages?max=${max}`),
   gmailMessage: (id) => req('GET', `/api/gmail/messages/${id}`),
   gmailCreateDay: (messageId) => req('POST', '/api/gmail/create-day', { message_id: messageId }),
-  gmailDraftReply: (eventId) => req('POST', '/api/gmail/draft-reply', { event_id: eventId }),
+  gmailDraftReply: (eventId, messageId) =>
+    req('POST', '/api/gmail/draft-reply', { event_id: eventId, message_id: messageId }),
 
   // day files (private attachments)
   addDayFile: async (eventId, file) => {

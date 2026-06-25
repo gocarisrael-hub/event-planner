@@ -46,9 +46,10 @@ export default function EventsTable() {
     }
   };
 
-  // Format the linked email's sent date (ISO) as he-IL date + time.
+  // Format the latest linked email's sent date (ISO) as he-IL date + time.
   const mailDate = (ev) => {
-    const d = ev.email?.date;
+    const list = ev.emails || [];
+    const d = list[list.length - 1]?.date;
     if (!d) return '—';
     const dt = new Date(d);
     if (Number.isNaN(dt.getTime())) return '—';
@@ -111,15 +112,20 @@ export default function EventsTable() {
                     <StatusSelect value={ev.status} onChange={(s) => changeStatus(ev.id, s)} />
                   </td>
                   <td className="px-4 py-3">
-                    {ev.email?.message_id ? (
-                      <a
-                        href={`https://mail.google.com/mail/?authuser=${encodeURIComponent(brand.gmailAccount)}#all/${ev.email.message_id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-ocar hover:underline whitespace-nowrap"
-                      >
-                        פתח מייל
-                      </a>
+                    {ev.emails?.[0]?.message_id ? (
+                      <span className="whitespace-nowrap">
+                        <a
+                          href={`https://mail.google.com/mail/?authuser=${encodeURIComponent(brand.gmailAccount)}#all/${ev.emails[0].message_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-ocar hover:underline"
+                        >
+                          פתח מייל
+                        </a>
+                        {ev.emails.length > 1 && (
+                          <span className="text-slate-400 mr-1">+{ev.emails.length - 1}</span>
+                        )}
+                      </span>
                     ) : (
                       '—'
                     )}

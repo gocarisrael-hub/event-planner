@@ -267,7 +267,7 @@ export default function DayBuilder() {
   const [draftError, setDraftError] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editDay, setEditDay] = useState(false);
-  const [mailExpanded, setMailExpanded] = useState(false);
+  const [expandedMails, setExpandedMails] = useState({}); // { [message_id]: bool }
 
   // Private notes (auto-saved, debounced). Local state mirrors event.notes and
   // is re-initialised whenever we switch to a different day.
@@ -286,6 +286,7 @@ export default function DayBuilder() {
   const [gmailNotConfigured, setGmailNotConfigured] = useState(false);
   const pollRef = useRef(null);
   const mountedRef = useRef(true);
+  const pendingReplyRef = useRef(undefined); // message_id to reply to after connect
 
   // Transient drag state: which item, its live top (px), and whether a real
   // drag happened (to suppress the click-to-edit on release).
@@ -446,13 +447,13 @@ export default function DayBuilder() {
     updateItem(d.id, { approx_start: minutesToStart(snappedMin) });
   };
 
-  const draftReply = async () => {
+  const draftReply = async (messageId) => {
     setDraftPending(true);
     setDraftError('');
     setDraftLink('');
     let ok = false;
     try {
-      const res = await api.gmailDraftReply(event.id);
+      const res = await api.gmailDraftReply(event.id, messageId);
       if (res && res.link) {
         setDraftLink(res.link);
         setShowConnect(false); // we're connected — hide the connect button
@@ -519,7 +520,7 @@ export default function DayBuilder() {
       if (!mountedRef.current) return;
       setConnecting(false);
       setShowConnect(false);
-      draftReply(); // nice-to-have: auto-retry now that we're connected
+      draftReply(pendingReplyRef.current); // auto-retry now that we're connected
     }, 3000);
   };
 
@@ -637,74 +638,91 @@ export default function DayBuilder() {
           </div>
         )}
 
-        {event.email && (
+        {event.emails && event.emails.length > 0 && (
           <div className="bg-white rounded-xl border border-slate-200 p-4 text-sm space-y-3">
-            <div>
-              <div className="font-medium mb-2">המייל המקושר</div>
-              <dl className="space-y-1 text-slate-500">
-                {event.email.from && (
-                  <div>
-                    <span className="text-slate-400">מאת: </span>
-                    {event.email.from}
-                  </div>
-                )}
-                {event.email.subject && (
-                  <div>
-                    <span className="text-slate-400">נושא: </span>
-                    {event.email.subject}
-                  </div>
-                )}
-                {event.email.date && (
-                  <div>
-                    <span className="text-slate-400">תאריך: </span>
-                    {new Date(event.email.date).toLocaleString('he-IL')}
-                  </div>
-                )}
-                {event.email.snippet && (
-                  <p className="text-slate-500 whitespace-pre-wrap pt-1">{event.email.snippet}</p>
-                )}
-              </dl>
-              {event.email.body && (
-                <div className="mt-2">
-                  <button
-                    type="button"
-                    onClick={() => setMailExpanded((v) => !v)}
-                    className="text-ocar hover:underline"
-                  >
-                    {mailExpanded ? 'כווץ' : 'הצג את כל המייל'}
-                  </button>
-                  {mailExpanded && (
-                    <div className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-sm text-slate-600 border border-slate-200 rounded-lg bg-slate-50 p-2">
-                      {event.email.body}
+            <div className="font-medium">מיילים מקושרים</div>
+
+            {event.emails.map((mail, idx) => {
+              const key = mail.message_id || `mail-${idx}`;
+              const expanded = !!expandedMails[key];
+              return (
+                <div
+                  key={key}
+                  className="border border-slate-200 rounded-lg p-3 space-y-2"
+                >
+                  <dl className="space-y-1 text-slate-500">
+                    {mail.from && (
+                      <div>
+                        <span className="text-slate-400">מאת: </span>
+                        {mail.from}
+                      </div>
+                    )}
+                    {mail.subject && (
+                      <div>
+                        <span className="text-slate-400">נושא: </span>
+                        {mail.subject}
+                      </div>
+                    )}
+                    {mail.date && (
+                      <div>
+                        <span className="text-slate-400">תאריך: </span>
+                        {new Date(mail.date).toLocaleString('he-IL')}
+                      </div>
+                    )}
+                    {mail.snippet && (
+                      <p className="text-slate-500 whitespace-pre-wrap pt-1">{mail.snippet}</p>
+                    )}
+                  </dl>
+                  {mail.body && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedMails((m) => ({ ...m, [key]: !m[key] }))
+                        }
+                        className="text-ocar hover:underline"
+                      >
+                        {expanded ? 'כווץ' : 'הצג את כל המייל'}
+                      </button>
+                      {expanded && (
+                        <div className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-sm text-slate-600 border border-slate-200 rounded-lg bg-slate-50 p-2">
+                          {mail.body}
+                        </div>
+                      )}
                     </div>
                   )}
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    {mail.message_id && (
+                      <a
+                        href={`https://mail.google.com/mail/?authuser=${encodeURIComponent(brand.gmailAccount)}#all/${mail.message_id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-ocar hover:underline"
+                      >
+                        פתח ב-Gmail ↗
+                      </a>
+                    )}
+                    <button
+                      onClick={() => {
+                        pendingReplyRef.current = mail.message_id || undefined;
+                        draftReply(mail.message_id || undefined);
+                      }}
+                      disabled={draftPending}
+                      className="bg-ocar text-white px-3 py-1.5 rounded-lg font-medium hover:opacity-90 disabled:opacity-60"
+                    >
+                      {draftPending ? 'מכין טיוטה…' : 'השב עם הצעה (ללא מחירים)'}
+                    </button>
+                  </div>
                 </div>
-              )}
-              {event.email.message_id && (
-                <a
-                  href={`https://mail.google.com/mail/?authuser=${encodeURIComponent(brand.gmailAccount)}#all/${event.email.message_id}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-block mt-2 text-ocar hover:underline"
-                >
-                  פתח ב-Gmail ↗
-                </a>
-              )}
-            </div>
+              );
+            })}
 
             <div className="border-t border-slate-100 pt-3">
-              <button
-                onClick={draftReply}
-                disabled={draftPending}
-                className="w-full bg-ocar text-white px-3 py-2 rounded-lg font-medium hover:opacity-90 disabled:opacity-60"
-              >
-                {draftPending ? 'מכין טיוטה…' : 'השב עם הצעה (ללא מחירים)'}
-              </button>
               {showConnect && !gmailNotConfigured && (
                 <button
                   onClick={connectGmail}
                   disabled={connecting}
-                  className="w-full mt-2 border border-ocar text-ocar px-3 py-2 rounded-lg font-medium hover:bg-ocar-soft disabled:opacity-60"
+                  className="w-full border border-ocar text-ocar px-3 py-2 rounded-lg font-medium hover:bg-ocar-soft disabled:opacity-60"
                 >
                   {connecting ? 'ממתין לחיבור…' : 'התחבר ל-Gmail'}
                 </button>
