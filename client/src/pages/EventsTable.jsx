@@ -46,6 +46,19 @@ export default function EventsTable() {
     }
   };
 
+  // Format the linked email's sent date (ISO) as he-IL date + time.
+  const mailDate = (ev) => {
+    const d = ev.email?.date;
+    if (!d) return '—';
+    const dt = new Date(d);
+    if (Number.isNaN(dt.getTime())) return '—';
+    return (
+      dt.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+      ' · ' +
+      dt.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+    );
+  };
+
   return (
     <div dir="rtl">
       <h1 className="text-2xl font-bold mb-6">סטטוס ימים</h1>
@@ -80,6 +93,7 @@ export default function EventsTable() {
                 <th className="px-4 py-3 font-medium">מתי</th>
                 <th className="px-4 py-3 font-medium">סטטוס</th>
                 <th className="px-4 py-3 font-medium">מייל</th>
+                <th className="px-4 py-3 font-medium">נשלח</th>
                 <th className="px-4 py-3 font-medium" />
               </tr>
             </thead>
@@ -110,6 +124,7 @@ export default function EventsTable() {
                       '—'
                     )}
                   </td>
+                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{mailDate(ev)}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <Link to={`/day/${ev.id}`} className="text-ocar font-medium hover:underline">
                       פתח
