@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { brand } from '../brand/brand.js';
+import { useAuthStore } from '../store/useAuthStore.js';
 import { useUnsavedStore, useBeforeUnloadGuard } from '../store/useUnsavedStore.js';
 
 function Tab({ to, children }) {
@@ -22,6 +23,10 @@ export default function Layout() {
   const navigate = useNavigate();
   const dirty = useUnsavedStore((s) => s.dirty);
   const setDirty = useUnsavedStore((s) => s.setDirty);
+  const email = useAuthStore((s) => s.email);
+  const role = useAuthStore((s) => s.role);
+  const logout = useAuthStore((s) => s.logout);
+  const isViewer = role === 'viewer';
 
   useBeforeUnloadGuard();
 
@@ -31,7 +36,12 @@ export default function Layout() {
       if (!ok) return;
       setDirty(false);
     }
-    navigate('/');
+    navigate(isViewer ? '/status' : '/');
+  };
+
+  const doLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
   };
 
   return (
@@ -52,11 +62,27 @@ export default function Layout() {
             <span className="text-xs text-slate-400 hidden sm:inline">{brand.tagline}</span>
           </button>
           <nav className="flex items-center gap-1 mr-auto">
-            <Tab to="/">הימים שלי</Tab>
-            <Tab to="/status">סטטוס</Tab>
-            <Tab to="/catalog">קטלוג</Tab>
-            <Tab to="/settings">הגדרות</Tab>
+            {isViewer ? (
+              <Tab to="/status">סטטוס</Tab>
+            ) : (
+              <>
+                <Tab to="/">הימים שלי</Tab>
+                <Tab to="/status">סטטוס</Tab>
+                <Tab to="/catalog">קטלוג</Tab>
+                <Tab to="/settings">הגדרות</Tab>
+              </>
+            )}
           </nav>
+          <div className="flex items-center gap-3">
+            {email && <span className="text-xs text-slate-400 hidden sm:inline">{email}</span>}
+            <button
+              type="button"
+              onClick={doLogout}
+              className="text-sm font-medium text-slate-500 hover:text-ocar px-2 py-1"
+            >
+              התנתק
+            </button>
+          </div>
         </div>
       </header>
       <main className="max-w-5xl mx-auto px-4 py-8">

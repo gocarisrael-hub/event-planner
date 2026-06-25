@@ -1,11 +1,35 @@
+import { useAuthStore } from '../store/useAuthStore.js';
+
+const TOKEN_KEY = 'ep_auth_token';
+
+// Attach the Bearer token (if any) to a headers object.
+export function authHeaders(extra = {}) {
+  const token = useAuthStore.getState().token || localStorage.getItem(TOKEN_KEY);
+  return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
+}
+
+// On any 401: clear auth + redirect to /login. Skip when already on /login.
+function handle401() {
+  useAuthStore.getState().clear();
+  if (window.location.pathname !== '/login') {
+    window.location.assign('/login');
+  }
+}
+
 // Thin fetch wrapper around the /api routes.
 async function req(method, url, body) {
-  const opts = { method, headers: {} };
+  const opts = { method, headers: authHeaders() };
   if (body !== undefined) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
   }
   const res = await fetch(url, opts);
+  if (res.status === 401) {
+    handle401();
+    const err = new Error(`${method} ${url} → 401`);
+    err.status = 401;
+    throw err;
+  }
   if (!res.ok) {
     let body = null;
     try {
@@ -68,11 +92,21 @@ export const api = {
   gmailDraftReply: (eventId, messageId) =>
     req('POST', '/api/gmail/draft-reply', { event_id: eventId, message_id: messageId }),
 
+  // auth + users
+  listUsers: () => req('GET', '/api/users'),
+  createUser: (data) => req('POST', '/api/users', data),
+  deleteUser: (id) => req('DELETE', `/api/users/${id}`),
+
   // day files (private attachments)
   addDayFile: async (eventId, file) => {
     const fd = new FormData();
     fd.append('file', file);
-    const res = await fetch(`/api/events/${eventId}/files`, { method: 'POST', body: fd });
+    const res = await fetch(`/api/events/${eventId}/files`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: fd,
+    });
+    if (res.status === 401) handle401();
     if (!res.ok) throw new Error('upload failed');
     return res.json(); // file object
   },
@@ -83,7 +117,12 @@ export const api = {
   uploadPhoto: async (file) => {
     const fd = new FormData();
     fd.append('photo', file);
-    const res = await fetch('/api/uploads', { method: 'POST', body: fd });
+    const res = await fetch('/api/uploads', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: fd,
+    });
+    if (res.status === 401) handle401();
     if (!res.ok) throw new Error('upload failed');
     return res.json(); // { path }
   },

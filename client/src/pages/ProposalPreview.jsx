@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api } from '../api/client.js';
+import { api, authHeaders } from '../api/client.js';
 import { brand } from '../brand/brand.js';
 import { formatDuration, formatPrice, formatRange, priceRange, sortByStart, timingLabel, total, whenLabel } from '../utils/format.js';
 
@@ -30,7 +30,9 @@ export default function ProposalPreview() {
     setError('');
     setPending(true);
     try {
-      const res = await fetch(`/api/events/${id}/proposal.pdf?prices=${withPrices}`);
+      const res = await fetch(`/api/events/${id}/proposal.pdf?prices=${withPrices}`, {
+        headers: authHeaders(),
+      });
       if (!res.ok) throw new Error(`status ${res.status}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
