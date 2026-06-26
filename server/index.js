@@ -43,13 +43,13 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// Viewer allowlist. A viewer may ONLY:
+// Viewer allowlist. A viewer is PURELY READ-ONLY and may ONLY:
 //   - GET  /api/events            (list)
 //   - GET  /api/events/:id        (single)
 //   - GET  /api/statuses
-//   - PATCH /api/events/:id  with a body whose ONLY key is `status`
-// Everything else (catalog, categories, uploads, gmail, users, events
-// create/delete/items/files, statuses writes) is admin-only. Admins bypass.
+// Everything else — including ANY write (PATCH/POST/PUT/DELETE), catalog,
+// categories, uploads, gmail, users, events create/delete/items/files,
+// statuses writes — is admin-only. Admins bypass.
 function viewerGuard(req, res, next) {
   if (!req.user || req.user.role === 'admin') return next();
   if (req.user.role !== 'viewer') return res.status(403).json({ error: 'forbidden' });
@@ -61,16 +61,8 @@ function viewerGuard(req, res, next) {
   const isEventsRead =
     method === 'GET' && /^\/events(\/[^/]+)?$/.test(path);
   const isStatusesRead = method === 'GET' && path === '/statuses';
-  const isStatusPatch =
-    method === 'PATCH' &&
-    /^\/events\/[^/]+$/.test(path) &&
-    req.body &&
-    typeof req.body === 'object' &&
-    !Array.isArray(req.body) &&
-    Object.keys(req.body).length === 1 &&
-    Object.prototype.hasOwnProperty.call(req.body, 'status');
 
-  if (isEventsRead || isStatusesRead || isStatusPatch) return next();
+  if (isEventsRead || isStatusesRead) return next();
   return res.status(403).json({ error: 'forbidden' });
 }
 
