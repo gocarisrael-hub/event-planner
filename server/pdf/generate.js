@@ -20,6 +20,9 @@ const JPEG_QUALITY = 78;
 // option.photos[]), de-duplicated.
 function collectPhotoPaths(event) {
   const paths = new Set();
+  // The cover/hero photo is embedded like any other so the hero band can render
+  // it as a base64 data URI (Puppeteer has no base URL).
+  if (event.cover_photo) paths.add(event.cover_photo);
   for (const it of event.items || []) {
     for (const p of it.photos || []) if (p) paths.add(p);
     for (const o of it.options || []) {
@@ -178,13 +181,32 @@ export async function generateProposalPdf(event, { prices } = { prices: false })
   // JPEGs instead of full-size originals.
   const photos = await buildPhotoMap(event);
   const logo = await readLogoDataUri();
+  // The hero/cover image: explicit cover_photo if present (and embeddable),
+  // else the template derives one from the first activity photo in `photos`.
+  const cover = event.cover_photo ? photos[event.cover_photo] || null : null;
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
     // 'load' (not 'networkidle0') with a bounded timeout so a slow/unreachable
     // font or image URL can't hang draft-reply indefinitely.
-    await page.setContent(proposalHtml(event, { prices, photos, logo }), { waitUntil: 'load', timeout: 15000 });
-    const out = await page.pdf({ format: 'A4', printBackground: true });
+    await page.setContent(proposalHtml(event, { prices, photos, logo, cover }), { waitUntil: 'load', timeout: 15000 });
+    // A slim header/footer carries the wordmark + page numbers. The page `margin`
+    // here reserves vertical space for them; the body CSS uses `@page{margin:0}`
+    // and its own .page padding, so content never overlaps the footer band.
+    const FOOT = '#9a9aa0';
+    const out = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      displayHeaderFooter: true,
+      headerTemplate: '<span></span>',
+      footerTemplate: `
+        <div style="width:100%; padding:0 12mm; font-family:Heebo,Arial,sans-serif;
+          font-size:8px; color:${FOOT}; display:flex; justify-content:space-between; align-items:center;">
+          <span>star הפקות · בונים ימי כיף וימי גיבוש</span>
+          <span>עמוד <span class="pageNumber"></span> / <span class="totalPages"></span></span>
+        </div>`,
+      margin: { top: '6mm', bottom: '12mm', left: '0mm', right: '0mm' },
+    });
     // Modern Puppeteer returns a Uint8Array; normalize to a Node Buffer so
     // callers can rely on buffer.toString('base64') etc.
     const proposalBuffer = Buffer.isBuffer(out) ? out : Buffer.from(out);
