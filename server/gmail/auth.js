@@ -19,7 +19,14 @@ export const SCOPES = [
 ];
 
 const PORT = process.env.PORT || 4001;
-const REDIRECT_URI = `http://localhost:${PORT}/api/gmail/callback`;
+// The OAuth callback MUST exactly match an "Authorized redirect URI" on the
+// Google OAuth client. On the hosted server, derive it from the public URL
+// (GMAIL_REDIRECT_URI or APP_BASE_URL); fall back to localhost in dev.
+const REDIRECT_URI =
+  process.env.GMAIL_REDIRECT_URI ||
+  (process.env.APP_BASE_URL
+    ? `${process.env.APP_BASE_URL.replace(/\/+$/, '')}/api/gmail/callback`
+    : `http://localhost:${PORT}/api/gmail/callback`);
 
 // Read client id/secret from credentials.json (either "installed" or "web"
 // shape) or from env vars. Returns null when nothing is configured.
