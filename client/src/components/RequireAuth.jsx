@@ -5,8 +5,8 @@ import { useAuthStore } from '../store/useAuthStore.js';
 // Guards the authed app shell:
 //  - validates the stored token on first mount (loadMe)
 //  - unauthed → /login
-//  - authed viewer → may ONLY be at /status or a /day/:id page (read-only);
-//    anything else redirects to /status
+//  - authed viewer → may ONLY be at /status (read-only); anything else
+//    (including /day/*) redirects to /status
 //  - authed admin → full access
 export default function RequireAuth() {
   const { token, role, loaded, loadMe } = useAuthStore();
@@ -28,7 +28,7 @@ export default function RequireAuth() {
     return <Navigate to="/login" replace />;
   }
 
-  if (role === 'viewer' && location.pathname !== '/status' && !location.pathname.startsWith('/day/')) {
+  if (role === 'viewer' && location.pathname !== '/status') {
     return <Navigate to="/status" replace />;
   }
 

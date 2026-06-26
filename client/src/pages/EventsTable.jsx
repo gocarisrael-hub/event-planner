@@ -5,8 +5,12 @@ import { brand } from '../brand/brand.js';
 import { whenLabel } from '../utils/format.js';
 import StatusSelect from '../components/StatusSelect.jsx';
 import { useStatusStore } from '../store/useStatusStore.js';
+import { useAuthStore } from '../store/useAuthStore.js';
+import { statusLabel, statusBadgeClass } from '../utils/status.js';
 
 export default function EventsTable() {
+  const role = useAuthStore((s) => s.role);
+  const isViewer = role === 'viewer';
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -156,24 +160,38 @@ export default function EventsTable() {
                 <SortHeader label="סטטוס" sortKey="status" active={sortKey} dir={sortDir} onSort={toggleSort} />
                 <th className="px-4 py-3 font-medium">מייל</th>
                 <SortHeader label="נשלח" sortKey="sent" active={sortKey} dir={sortDir} onSort={toggleSort} />
-                <th className="px-4 py-3 font-medium" />
+                {!isViewer && <th className="px-4 py-3 font-medium" />}
               </tr>
             </thead>
             <tbody>
               {sorted.map((ev) => (
                 <tr key={ev.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                   <td className="px-4 py-3">
-                    <Link to={`/day/${ev.id}`} className="font-medium text-slate-800 hover:text-ocar">
-                      {ev.title}
-                    </Link>
+                    {isViewer ? (
+                      <span className="font-medium text-slate-800">{ev.title}</span>
+                    ) : (
+                      <Link to={`/day/${ev.id}`} className="font-medium text-slate-800 hover:text-ocar">
+                        {ev.title}
+                      </Link>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-slate-600">{ev.client_name || '—'}</td>
                   <td className="px-4 py-3 text-slate-600">{whenLabel(ev) || '—'}</td>
                   <td className="px-4 py-3">
-                    <StatusSelect value={ev.status} onChange={(s) => changeStatus(ev.id, s)} />
+                    {isViewer ? (
+                      <span
+                        className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass(statuses, ev.status)}`}
+                      >
+                        {statusLabel(statuses, ev.status)}
+                      </span>
+                    ) : (
+                      <StatusSelect value={ev.status} onChange={(s) => changeStatus(ev.id, s)} />
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    {ev.emails?.[0]?.message_id ? (
+                    {isViewer ? (
+                      <span className="text-slate-600">{ev.emails?.[0]?.subject || '—'}</span>
+                    ) : ev.emails?.[0]?.message_id ? (
                       <span className="whitespace-nowrap">
                         <a
                           href={`https://mail.google.com/mail/?authuser=${encodeURIComponent(brand.gmailAccount)}#all/${ev.emails[0].message_id}`}
@@ -192,11 +210,13 @@ export default function EventsTable() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{mailDate(ev)}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <Link to={`/day/${ev.id}`} className="text-ocar font-medium hover:underline">
-                      פתח
-                    </Link>
-                  </td>
+                  {!isViewer && (
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <Link to={`/day/${ev.id}`} className="text-ocar font-medium hover:underline">
+                        פתח
+                      </Link>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
