@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Categories from './Categories.jsx';
 import { api } from '../api/client.js';
+import { useCatalogStore } from '../store/useCatalogStore.js';
 import { useStatusStore } from '../store/useStatusStore.js';
 import { COLORS, COLOR_MAP, statusBadgeClass, statusDotClass } from '../utils/status.js';
 
@@ -253,6 +254,78 @@ function UsersSection() {
   );
 }
 
+// Small inline manager for a defined list (מרחב / לקוח) — list each item with
+// a delete control, plus an add-new input. Mirrors the categories section.
+function ListManager({ items, onAdd, onRemove, placeholder, emptyText, confirmText }) {
+  const [name, setName] = useState('');
+
+  const add = async () => {
+    if (!name.trim()) return;
+    await onAdd(name.trim());
+    setName('');
+  };
+
+  const remove = (item) => {
+    if (confirm(confirmText(item.name))) onRemove(item.id);
+  };
+
+  return (
+    <div>
+      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4 flex gap-2">
+        <input
+          className={`${field} flex-1`}
+          placeholder={placeholder}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && add()}
+        />
+        <button onClick={add} className="bg-ocar text-white px-4 rounded-lg text-sm font-medium hover:opacity-90">
+          + הוסף
+        </button>
+      </div>
+      <div className="space-y-2">
+        {items.map((item) => (
+          <div key={item.id} className="bg-white rounded-xl border border-slate-200 p-3 flex items-center gap-3">
+            <span className="flex-1 font-medium">{item.name}</span>
+            <button onClick={() => remove(item)} className="text-slate-300 hover:text-red-500 px-2">✕</button>
+          </div>
+        ))}
+        {items.length === 0 && <p className="text-slate-400 text-sm">{emptyText}</p>}
+      </div>
+    </div>
+  );
+}
+
+function SpacesSection() {
+  const { spaces, loaded, load, addSpace, removeSpace } = useCatalogStore();
+  useEffect(() => { if (!loaded) load(); }, [loaded, load]);
+  return (
+    <ListManager
+      items={spaces}
+      onAdd={addSpace}
+      onRemove={removeSpace}
+      placeholder="שם מרחב חדש"
+      emptyText="עוד אין מרחבים."
+      confirmText={(n) => `למחוק את המרחב "${n}"?`}
+    />
+  );
+}
+
+function ClientsSection() {
+  const { clients, loaded, load, addClient, removeClient } = useCatalogStore();
+  useEffect(() => { if (!loaded) load(); }, [loaded, load]);
+  return (
+    <ListManager
+      items={clients}
+      onAdd={addClient}
+      onRemove={removeClient}
+      placeholder="שם לקוח חדש"
+      emptyText="עוד אין לקוחות."
+      confirmText={(n) => `למחוק את הלקוח "${n}"?`}
+    />
+  );
+}
+
 export default function Settings() {
   return (
     <div dir="rtl" className="max-w-2xl">
@@ -260,6 +333,22 @@ export default function Settings() {
 
       <section className="mb-12">
         <Categories />
+      </section>
+
+      <section className="mb-12">
+        <h2 className="text-xl font-bold mb-1">מרחב</h2>
+        <p className="text-slate-500 mb-4 text-sm">
+          הרשימה המוגדרת לבחירת מרחב בפעילויות הקטלוג. אפשר להוסיף ולהסיר.
+        </p>
+        <SpacesSection />
+      </section>
+
+      <section className="mb-12">
+        <h2 className="text-xl font-bold mb-1">לקוח</h2>
+        <p className="text-slate-500 mb-4 text-sm">
+          הרשימה המוגדרת לבחירת לקוח בימים. אפשר להוסיף ולהסיר.
+        </p>
+        <ClientsSection />
       </section>
 
       <section className="mb-12">

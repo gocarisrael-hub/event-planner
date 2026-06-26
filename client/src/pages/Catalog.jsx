@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api/client.js';
 import CategorySelect from '../components/CategorySelect.jsx';
+import SpaceSelect from '../components/SpaceSelect.jsx';
 import PhotoUploader from '../components/PhotoUploader.jsx';
 import { useCatalogStore } from '../store/useCatalogStore.js';
 import { formatDuration, formatPrice } from '../utils/format.js';
@@ -171,8 +172,7 @@ export default function Catalog() {
           <input className={field} placeholder="טלפון" value={draft.contact_phone}
             onChange={(e) => setDraft({ ...draft, contact_phone: e.target.value })} />
         </div>
-        <input className={field} placeholder="מרחב" value={draft.location}
-          onChange={(e) => setDraft({ ...draft, location: e.target.value })} />
+        <SpaceSelect value={draft.location} onChange={(location) => setDraft({ ...draft, location })} />
         <PhotoUploader photos={draft.photos} onChange={(photos) => setDraft({ ...draft, photos })} small />
         <button onClick={save} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90">
           + הוסף לקטלוג
@@ -233,8 +233,7 @@ export default function Catalog() {
                   <input className={field} value={c.contact_phone || ''} placeholder="טלפון"
                     onChange={(e) => updateCatalog(c.id, { contact_phone: e.target.value })} />
                 </div>
-                <input className={field} value={c.location || ''} placeholder="מרחב"
-                  onChange={(e) => updateCatalog(c.id, { location: e.target.value })} />
+                <SpaceSelect value={c.location || ''} onChange={(location) => updateCatalog(c.id, { location })} />
                 <PhotoUploader photos={c.photos || []} onChange={(photos) => updateCatalog(c.id, { photos })} small />
                 <CatalogFiles item={c} onChanged={refresh} />
                 <button onClick={() => setEditing(null)} className="text-ocar text-sm font-medium">סיום</button>

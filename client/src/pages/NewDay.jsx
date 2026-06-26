@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useUnsavedStore } from '../store/useUnsavedStore.js';
+import { useCatalogStore } from '../store/useCatalogStore.js';
 import { MONTHS, SEASONS } from '../utils/format.js';
 import DatePicker from '../components/DatePicker.jsx';
+import ClientSelect from '../components/ClientSelect.jsx';
 
 const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-ocar';
 
@@ -17,6 +19,8 @@ const whenField =
 export default function NewDay() {
   const navigate = useNavigate();
   const setDirty = useUnsavedStore((s) => s.setDirty);
+  const loaded = useCatalogStore((s) => s.loaded);
+  const loadCatalog = useCatalogStore((s) => s.load);
   const [whenMode, setWhenMode] = useState('date'); // date | month | season
   const [form, setForm] = useState({
     title: '',
@@ -31,6 +35,9 @@ export default function NewDay() {
   });
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Ensure the defined client (לקוח) list is available for ClientSelect.
+  useEffect(() => { if (!loaded) loadCatalog(); }, [loaded, loadCatalog]);
 
   // Mark the page as dirty whenever any field has content; clear when empty.
   useEffect(() => {
@@ -71,8 +78,7 @@ export default function NewDay() {
           </label>
           <label className="block">
             <span className="text-sm font-medium">לקוח</span>
-            <input className={field} value={form.client_name} onChange={(e) => set('client_name', e.target.value)}
-              placeholder="שם החברה / היחידה" />
+            <ClientSelect className={field} value={form.client_name} onChange={(v) => set('client_name', v)} />
           </label>
           <label className="block">
             <span className="text-sm font-medium">גודל הקבוצה</span>

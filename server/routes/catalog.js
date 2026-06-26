@@ -5,7 +5,7 @@ import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Router } from 'express';
 import multer from 'multer';
-import { catalog, categories } from '../db.js';
+import { catalog, categories, clients, spaces } from '../db.js';
 
 const router = Router();
 
@@ -97,3 +97,27 @@ categoryRouter.post('/', (req, res) => {
   res.status(201).json(categories.insert({ name }));
 });
 categoryRouter.delete('/:id', (req, res) => res.json({ ok: categories.remove(req.params.id) }));
+
+// --- Spaces (מרחב; defined list; mounted separately in index.js) -----------
+export const spaceRouter = Router();
+spaceRouter.get('/', (_req, res) => res.json(spaces.all()));
+spaceRouter.post('/', (req, res) => {
+  const name = (req.body?.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'name required' });
+  const existing = spaces.all().find((s) => s.name === name);
+  if (existing) return res.status(200).json(existing);
+  res.status(201).json(spaces.insert({ name }));
+});
+spaceRouter.delete('/:id', (req, res) => res.json({ ok: spaces.remove(req.params.id) }));
+
+// --- Clients (לקוח; defined list; mounted separately in index.js) ----------
+export const clientRouter = Router();
+clientRouter.get('/', (_req, res) => res.json(clients.all()));
+clientRouter.post('/', (req, res) => {
+  const name = (req.body?.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'name required' });
+  const existing = clients.all().find((c) => c.name === name);
+  if (existing) return res.status(200).json(existing);
+  res.status(201).json(clients.insert({ name }));
+});
+clientRouter.delete('/:id', (req, res) => res.json({ ok: clients.remove(req.params.id) }));
