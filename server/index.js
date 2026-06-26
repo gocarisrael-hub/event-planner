@@ -32,7 +32,12 @@ app.get('/api/version', (_req, res) => res.json({ version: '2026-06-24-gmail-rep
 function requireAuth(req, res, next) {
   const ctx = sessionFromToken(bearer(req));
   if (!ctx) return res.status(401).json({ error: 'unauthorized' });
-  req.user = { id: ctx.user.id, email: ctx.user.email, role: ctx.user.role };
+  req.user = {
+    id: ctx.user.id,
+    email: ctx.user.email,
+    role: ctx.user.role,
+    client: ctx.user.client || '',
+  };
   next();
 }
 

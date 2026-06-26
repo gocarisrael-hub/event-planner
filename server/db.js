@@ -103,6 +103,7 @@ function seedUsers() {
       id: randomUUID(),
       email: DEFAULT_ADMIN_EMAIL,
       role: 'admin',
+      client: '',
       password_hash,
       salt,
       created_at: new Date().toISOString(),
@@ -127,6 +128,13 @@ function migrate(d) {
   if (!Array.isArray(d.sessions)) {
     d.sessions = [];
     changed = true;
+  }
+  // Viewer scoping: users carry an assigned לקוח ('' / null = unrestricted).
+  for (const u of d.users || []) {
+    if (!('client' in u)) {
+      u.client = '';
+      changed = true;
+    }
   }
   // Spaces (מרחב) + clients (לקוח) are managed defined lists, like categories.
   if (!Array.isArray(d.spaces)) {

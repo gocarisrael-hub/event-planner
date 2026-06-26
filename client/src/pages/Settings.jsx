@@ -149,11 +149,30 @@ function StatusesSection() {
   );
 }
 
+// Dropdown of the managed לקוח list. '' = unrestricted (all clients).
+function ClientSelect({ value, onChange, className }) {
+  const { clients, loaded, load } = useCatalogStore();
+  useEffect(() => { if (!loaded) load(); }, [loaded, load]);
+  return (
+    <select
+      className={className || field}
+      value={value || ''}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="">כל הלקוחות</option>
+      {clients.map((c) => (
+        <option key={c.id} value={c.name}>{c.name}</option>
+      ))}
+    </select>
+  );
+}
+
 function UsersSection() {
   const [users, setUsers] = useState([]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('viewer');
+  const [client, setClient] = useState('');
   const [error, setError] = useState('');
 
   const reload = async () => {
@@ -175,14 +194,29 @@ function UsersSection() {
       return;
     }
     try {
-      await api.createUser({ email: email.trim(), password, role });
+      await api.createUser({
+        email: email.trim(),
+        password,
+        role,
+        client: role === 'viewer' ? client : '',
+      });
       setEmail('');
       setPassword('');
       setRole('viewer');
+      setClient('');
       reload();
     } catch (e) {
       if (e.serverCode === 'email_exists') setError('האימייל כבר קיים.');
       else setError('יצירת המשתמש נכשלה.');
+    }
+  };
+
+  const changeClient = async (u, nextClient) => {
+    try {
+      const updated = await api.updateUser(u.id, { client: nextClient });
+      setUsers((list) => list.map((x) => (x.id === u.id ? updated : x)));
+    } catch {
+      alert('עדכון הלקוח נכשל.');
     }
   };
 
@@ -212,6 +246,13 @@ function UsersSection() {
           >
             {u.role === 'admin' ? 'מנהל' : 'צופה'}
           </span>
+          {u.role === 'viewer' && (
+            <ClientSelect
+              value={u.client}
+              onChange={(next) => changeClient(u, next)}
+              className={`${field} min-w-[10rem]`}
+            />
+          )}
           <button
             onClick={() => del(u)}
             className="text-slate-300 hover:text-red-500 px-2"
@@ -242,6 +283,9 @@ function UsersSection() {
           <option value="viewer">צופה</option>
           <option value="admin">מנהל</option>
         </select>
+        {role === 'viewer' && (
+          <ClientSelect value={client} onChange={setClient} className={`${field} min-w-[10rem]`} />
+        )}
         <button
           onClick={add}
           className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90"
