@@ -5,7 +5,7 @@ import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Router } from 'express';
 import multer from 'multer';
-import { catalog, events, items } from '../db.js';
+import { catalog, events, items, users } from '../db.js';
 import { generateProposalPdf } from '../pdf/generate.js';
 
 const router = Router();
@@ -31,9 +31,28 @@ function withItems(event) {
   return { ...event, items: list };
 }
 
+// Resolve the לקוח a viewer is scoped to. Admins (or anything else) → null
+// (unrestricted). Viewers with no assigned client → null (see all). Reads
+// from req.user.client, falling back to the user record.
+function scopedClient(req) {
+  const u = req.user;
+  if (!u || u.role !== 'viewer') return null;
+  let client = u.client;
+  if (client === undefined || client === null) {
+    const record = users.find(u.id);
+    client = record && record.client;
+  }
+  client = String(client || '').trim();
+  return client || null;
+}
+
 // --- Events ---------------------------------------------------------------
-router.get('/', (_req, res) => {
-  res.json(events.all().map(withItems));
+router.get('/', (req, res) => {
+  const client = scopedClient(req);
+  const list = client
+    ? events.all().filter((ev) => ev.client_name === client)
+    : events.all();
+  res.json(list.map(withItems));
 });
 
 router.post('/', (req, res) => {
@@ -63,6 +82,11 @@ router.post('/', (req, res) => {
 router.get('/:id', (req, res) => {
   const event = events.find(req.params.id);
   if (!event) return res.status(404).json({ error: 'not found' });
+  // Don't leak other clients' days to a scoped viewer.
+  const client = scopedClient(req);
+  if (client && event.client_name !== client) {
+    return res.status(404).json({ error: 'not found' });
+  }
   res.json(withItems(event));
 });
 

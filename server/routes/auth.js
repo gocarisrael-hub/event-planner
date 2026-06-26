@@ -8,7 +8,13 @@ const now = () => new Date().toISOString();
 
 // Public view of a user — never leak the hash/salt.
 function publicUser(u) {
-  return { id: u.id, email: u.email, role: u.role, created_at: u.created_at };
+  return {
+    id: u.id,
+    email: u.email,
+    role: u.role,
+    client: u.client || '',
+    created_at: u.created_at,
+  };
 }
 
 // Constant-time hex compare. Returns false on any length mismatch.
@@ -52,7 +58,7 @@ authRouter.get('/me', (req, res) => {
   const token = bearer(req);
   const ctx = sessionFromToken(token);
   if (!ctx) return res.status(401).json({ error: 'unauthorized' });
-  res.json({ email: ctx.user.email, role: ctx.user.role });
+  res.json({ email: ctx.user.email, role: ctx.user.role, client: ctx.user.client || '' });
 });
 
 authRouter.post('/logout', (req, res) => {
@@ -70,7 +76,7 @@ usersRouter.get('/', (_req, res) => {
 });
 
 usersRouter.post('/', (req, res) => {
-  const { email, password, role } = req.body || {};
+  const { email, password, role, client } = req.body || {};
   const cleanEmail = String(email || '').trim().toLowerCase();
   if (!cleanEmail || !password) {
     return res.status(400).json({ error: 'email_and_password_required' });
@@ -81,15 +87,31 @@ usersRouter.post('/', (req, res) => {
   const dup = users.all().some((u) => String(u.email || '').toLowerCase() === cleanEmail);
   if (dup) return res.status(409).json({ error: 'email_exists' });
 
+  // The assigned לקוח is only meaningful for viewers; admins are unrestricted.
+  const assignedClient = role === 'viewer' ? String(client || '').trim() : '';
+
   const { password_hash, salt } = hashPassword(password);
   const user = users.insert({
     email: cleanEmail,
     role,
+    client: assignedClient,
     password_hash,
     salt,
     created_at: now(),
   });
   res.status(201).json(publicUser(user));
+});
+
+// Update a user's assigned לקוח (admin only). Only `client` is mutable here;
+// other sensitive fields (email/role/password) are intentionally ignored.
+usersRouter.patch('/:id', (req, res) => {
+  const user = users.find(req.params.id);
+  if (!user) return res.status(404).json({ error: 'not found' });
+  const body = req.body || {};
+  if ('client' in body) {
+    users.update(user.id, { client: String(body.client || '').trim() });
+  }
+  res.json(publicUser(users.find(user.id)));
 });
 
 usersRouter.delete('/:id', (req, res) => {

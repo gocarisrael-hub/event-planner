@@ -105,6 +105,7 @@ export const api = {
   // auth + users
   listUsers: () => req('GET', '/api/users'),
   createUser: (data) => req('POST', '/api/users', data),
+  updateUser: (id, patch) => req('PATCH', `/api/users/${id}`, patch),
   deleteUser: (id) => req('DELETE', `/api/users/${id}`),
 
   // day files (private attachments)
