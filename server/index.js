@@ -25,7 +25,7 @@ app.use('/brand', express.static(join(__dirname, 'assets')));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 // Build/deploy marker — bump this string each deploy to verify what's live.
-app.get('/api/version', (_req, res) => res.json({ version: '2026-06-24-gmail-reply-fix' }));
+app.get('/api/version', (_req, res) => res.json({ version: '2026-06-26-editorial' }));
 
 // --- Auth middleware -------------------------------------------------------
 // Valid Bearer token → req.user = { id, email, role }; otherwise 401.
