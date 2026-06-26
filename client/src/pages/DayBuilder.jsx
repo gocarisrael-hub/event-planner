@@ -7,6 +7,7 @@ import BudgetMeter from '../components/BudgetMeter.jsx';
 import DatePicker from '../components/DatePicker.jsx';
 import TimelineItem from '../components/TimelineItem.jsx';
 import StatusSelect from '../components/StatusSelect.jsx';
+import ClientSelect from '../components/ClientSelect.jsx';
 import { useCatalogStore } from '../store/useCatalogStore.js';
 import { useEventStore } from '../store/useEventStore.js';
 import { formatPrice, formatRange, MONTHS, SEASONS, timingLabel, total, whenLabel } from '../utils/format.js';
@@ -243,8 +244,7 @@ function DayDetailsEditor({ event, onSave, onClose }) {
         </label>
         <label className="block">
           <span className="text-sm font-medium">לקוח</span>
-          <input className={field} value={form.client_name} onChange={(e) => set('client_name', e.target.value)}
-            placeholder="שם החברה / היחידה" />
+          <ClientSelect className={field} value={form.client_name} onChange={(v) => set('client_name', v)} />
         </label>
         <label className="block">
           <span className="text-sm font-medium">גודל הקבוצה</span>

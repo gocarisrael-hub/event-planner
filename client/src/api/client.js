@@ -77,6 +77,16 @@ export const api = {
   createCategory: (name) => req('POST', '/api/categories', { name }),
   deleteCategory: (id) => req('DELETE', `/api/categories/${id}`),
 
+  // spaces (מרחב; defined list)
+  listSpaces: () => req('GET', '/api/spaces'),
+  createSpace: (name) => req('POST', '/api/spaces', { name }),
+  deleteSpace: (id) => req('DELETE', `/api/spaces/${id}`),
+
+  // clients (לקוח; defined list)
+  listClients: () => req('GET', '/api/clients'),
+  createClient: (name) => req('POST', '/api/clients', { name }),
+  deleteClient: (id) => req('DELETE', `/api/clients/${id}`),
+
   // statuses (user-editable event statuses)
   listStatuses: () => req('GET', '/api/statuses'),
   createStatus: (label, color) => req('POST', '/api/statuses', { label, color }),

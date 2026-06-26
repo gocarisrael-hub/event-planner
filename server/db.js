@@ -12,6 +12,8 @@ const DATA_FILE = join(DATA_DIR, 'app.json');
 
 const EMPTY = {
   categories: [],
+  spaces: [],
+  clients: [],
   catalog: [],
   events: [],
   items: [],
@@ -55,6 +57,8 @@ const DEFAULT_CATEGORIES = [
 function seed() {
   return {
     categories: DEFAULT_CATEGORIES.map((name) => ({ id: randomUUID(), name })),
+    spaces: [],
+    clients: [],
     catalog: [
       {
         id: randomUUID(),
@@ -123,6 +127,35 @@ function migrate(d) {
   if (!Array.isArray(d.sessions)) {
     d.sessions = [];
     changed = true;
+  }
+  // Spaces (מרחב) + clients (לקוח) are managed defined lists, like categories.
+  if (!Array.isArray(d.spaces)) {
+    d.spaces = [];
+    changed = true;
+  }
+  if (!Array.isArray(d.clients)) {
+    d.clients = [];
+    changed = true;
+  }
+  // Seed each list once (when empty) from existing free-text data so existing
+  // installs keep their מרחב / לקוח values as selectable options.
+  if (d.spaces.length === 0) {
+    const names = [
+      ...new Set((d.catalog || []).map((c) => (c.location || '').trim()).filter(Boolean)),
+    ];
+    if (names.length) {
+      d.spaces = names.map((name) => ({ id: randomUUID(), name }));
+      changed = true;
+    }
+  }
+  if (d.clients.length === 0) {
+    const names = [
+      ...new Set((d.events || []).map((ev) => (ev.client_name || '').trim()).filter(Boolean)),
+    ];
+    if (names.length) {
+      d.clients = names.map((name) => ({ id: randomUUID(), name }));
+      changed = true;
+    }
   }
   for (const c of d.catalog || []) {
     if ('default_price_min' in c || 'default_price_max' in c) {
@@ -247,6 +280,8 @@ function col(name) {
 }
 
 export const categories = col('categories');
+export const spaces = col('spaces');
+export const clients = col('clients');
 export const catalog = col('catalog');
 export const events = col('events');
 export const items = col('items');

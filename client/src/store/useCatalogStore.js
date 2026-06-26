@@ -4,11 +4,18 @@ import { api } from '../api/client.js';
 export const useCatalogStore = create((set, get) => ({
   catalog: [],
   categories: [],
+  spaces: [],
+  clients: [],
   loaded: false,
 
   load: async () => {
-    const [catalog, categories] = await Promise.all([api.listCatalog(), api.listCategories()]);
-    set({ catalog, categories, loaded: true });
+    const [catalog, categories, spaces, clients] = await Promise.all([
+      api.listCatalog(),
+      api.listCategories(),
+      api.listSpaces(),
+      api.listClients(),
+    ]);
+    set({ catalog, categories, spaces, clients, loaded: true });
   },
 
   refresh: async () => {
@@ -41,5 +48,31 @@ export const useCatalogStore = create((set, get) => ({
   removeCategory: async (id) => {
     await api.deleteCategory(id);
     set({ categories: get().categories.filter((c) => c.id !== id) });
+  },
+
+  // Defined space (מרחב) list.
+  addSpace: async (name) => {
+    const row = await api.createSpace(name);
+    if (!get().spaces.some((s) => s.id === row.id)) {
+      set({ spaces: [...get().spaces, row] });
+    }
+    return row;
+  },
+  removeSpace: async (id) => {
+    await api.deleteSpace(id);
+    set({ spaces: get().spaces.filter((s) => s.id !== id) });
+  },
+
+  // Defined client (לקוח) list.
+  addClient: async (name) => {
+    const row = await api.createClient(name);
+    if (!get().clients.some((c) => c.id === row.id)) {
+      set({ clients: [...get().clients, row] });
+    }
+    return row;
+  },
+  removeClient: async (id) => {
+    await api.deleteClient(id);
+    set({ clients: get().clients.filter((c) => c.id !== id) });
   },
 }));
