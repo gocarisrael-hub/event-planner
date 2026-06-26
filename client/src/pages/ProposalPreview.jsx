@@ -92,7 +92,6 @@ export default function ProposalPreview() {
         </div>
 
         <h1 className="text-3xl font-extrabold mb-2" style={{ color: brand.colors.dark }}>{event.title}</h1>
-        {event.requests && <p className="text-slate-600 mb-6">{event.requests}</p>}
 
         <h2 className="text-lg font-bold mb-3" style={{ color: brand.colors.primary }}>הלו״ז ליום</h2>
         <div className="space-y-3">
