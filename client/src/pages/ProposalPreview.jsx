@@ -55,6 +55,22 @@ export default function ProposalPreview() {
   const items = sortByStart(event.items || []);
   const { low, high } = total(items);
 
+  // Hero image: explicit cover, else the first photo we can find on the schedule.
+  const heroPhoto =
+    event.cover_photo ||
+    items.find((it) => it.photos?.[0])?.photos?.[0] ||
+    items.flatMap((it) => it.options || []).find((o) => o.photos?.[0])?.photos?.[0] ||
+    null;
+
+  // Meta line under the title: client · group · when · location.
+  const eventLocation = event.location || items.find((it) => it.location)?.location || '';
+  const metaParts = [
+    event.client_name,
+    event.group_size ? `${event.group_size} משתתפים` : '',
+    whenLabel(event),
+    eventLocation,
+  ].filter(Boolean);
+
   return (
     <div className="min-h-screen bg-slate-100" dir="rtl">
       {/* Toolbar — hidden when printing */}
@@ -72,106 +88,165 @@ export default function ProposalPreview() {
         </div>
       </div>
 
-      {/* The document */}
-      <div className="print-page max-w-3xl mx-auto bg-white my-6 shadow-lg p-10" style={{ minHeight: '297mm' }}>
-        {/* Header */}
-        <div className="flex items-center justify-between border-b-2 pb-4 mb-6" style={{ borderColor: brand.colors.primary }}>
-          <div>
-            {brand.logoUrl ? (
-              <img src={brand.logoUrl} alt={brand.name} className="h-12" />
-            ) : (
-              <div className="text-3xl font-extrabold" style={{ color: brand.colors.primary }}>{brand.name}</div>
+      {/* The document — editorial, photo-forward preview */}
+      <div className="print-page max-w-3xl mx-auto bg-white my-6 shadow-lg overflow-hidden" style={{ minHeight: '297mm' }}>
+        {/* Hero header */}
+        {heroPhoto ? (
+          <div className="relative h-[200px] w-full">
+            <img src={heroPhoto} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            {/* Dark gradient so the title/meta stay legible over any photo */}
+            <div
+              className="absolute inset-0"
+              style={{ background: 'linear-gradient(to top, rgba(20,20,20,0.78) 0%, rgba(20,20,20,0.15) 55%, rgba(20,20,20,0.35) 100%)' }}
+            />
+            {brand.logoUrl && (
+              <img
+                src={brand.logoUrl}
+                alt={brand.name}
+                className="absolute top-4 right-4 h-9 rounded bg-white/90 px-2 py-1 shadow-sm"
+              />
             )}
-            <div className="text-xs text-slate-400">{brand.tagline}</div>
-          </div>
-          <div className="text-left text-sm text-slate-500">
-            {event.client_name && <div className="font-medium text-slate-700">{event.client_name}</div>}
-            {whenLabel(event) && <div>{whenLabel(event)}</div>}
-            {event.group_size && <div>{event.group_size} משתתפים</div>}
-          </div>
-        </div>
-
-        <h1 className="text-3xl font-extrabold mb-2" style={{ color: brand.colors.dark }}>{event.title}</h1>
-
-        <h2 className="text-lg font-bold mb-3" style={{ color: brand.colors.primary }}>הלו״ז ליום</h2>
-        <div className="space-y-3">
-          {items.map((it) => (
-            <div key={it.id} className="print-break border-b border-slate-100 pb-3">
-              <div className="flex gap-4">
-                <div className="min-w-[90px] text-center">
-                  <div className="font-bold" style={{ color: brand.colors.primary }}><bdi>{timingLabel(it) || '—'}</bdi></div>
-                  {it.approx_duration_hours ? (
-                    <div className="text-xs text-slate-400">{formatDuration(it.approx_duration_hours)}</div>
-                  ) : null}
-                </div>
-                {!it.options?.length && it.photos?.[0] && (
-                  <img src={it.photos[0]} alt="" className="h-20 w-24 rounded-lg object-cover" />
-                )}
-                <div className="flex-1">
-                  <div className="font-semibold">{it.title}</div>
-                  {it.description && <div className="text-sm text-slate-500 break-words">{it.description}</div>}
-                </div>
-                {showPrices && !it.options?.length && formatPrice(it.price) && (
-                  <div className="text-sm font-medium whitespace-nowrap">{formatPrice(it.price)}</div>
-                )}
-                {showPrices && it.options?.length > 0 && (() => {
-                  // Choice-block slot price is a range spanning item.price + option prices.
-                  const { low: lo, high: hi } = priceRange(it);
-                  return <div className="text-sm font-medium whitespace-nowrap">{formatRange(lo, hi)}</div>;
-                })()}
-              </div>
-
-              {it.options?.length > 0 && (
-                <div className="mt-3 pr-[106px]">
-                  <div className="text-xs font-medium text-slate-400 mb-2">בחירה בין:</div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {it.options.map((o) => (
-                      <div key={o.id} className="border border-slate-200 rounded-lg p-3 flex gap-3">
-                        {o.photos?.[0] && (
-                          <img src={o.photos[0]} alt="" className="h-16 w-16 rounded object-cover flex-shrink-0" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-start gap-2">
-                            <div className="font-semibold">{o.title}</div>
-                            {showPrices && formatPrice(o.price) && (
-                              <div className="text-sm font-medium whitespace-nowrap">{formatPrice(o.price)}</div>
-                            )}
-                          </div>
-                          {o.description && <div className="text-sm text-slate-500 break-words">{o.description}</div>}
-                          {(o.contact_name || o.contact_phone) && (
-                            <div className="text-xs text-slate-400 mt-1">
-                              {[o.contact_name, o.contact_phone].filter(Boolean).join(' · ')}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            <div className="absolute bottom-0 right-0 left-0 p-6 text-white">
+              <h1 className="text-3xl font-extrabold drop-shadow-sm">{event.title}</h1>
+              {metaParts.length > 0 && (
+                <div className="mt-1 text-sm text-white/90">{metaParts.join(' · ')}</div>
               )}
             </div>
-          ))}
-        </div>
-
-        {showPrices && high > 0 && (
-          <div className="mt-6 pt-4 border-t-2" style={{ borderColor: brand.colors.primary }}>
-            <div className="flex justify-between items-center">
-              <span className="font-bold text-lg">מחיר לאדם</span>
-              <span className="font-extrabold text-lg" style={{ color: brand.colors.primary }}>
-                {formatRange(low, high)}
-              </span>
+          </div>
+        ) : (
+          <div className="px-10 pt-8 pb-6" style={{ background: brand.colors.dark }}>
+            <div className="flex items-center justify-between">
+              {brand.logoUrl ? (
+                <img src={brand.logoUrl} alt={brand.name} className="h-10 rounded bg-white/90 px-2 py-1" />
+              ) : (
+                <div className="text-2xl font-extrabold text-white">{brand.name}</div>
+              )}
+              <div className="text-xs text-white/70">{brand.tagline}</div>
             </div>
-            {event.group_size > 0 && (
-              <div className="flex justify-between items-center text-slate-500 mt-1">
-                <span>סה״כ לקבוצה (×{event.group_size})</span>
-                <span className="font-medium">{formatRange(low * event.group_size, high * event.group_size)}</span>
-              </div>
+            <h1 className="mt-5 text-3xl font-extrabold text-white">{event.title}</h1>
+            {metaParts.length > 0 && (
+              <div className="mt-1 text-sm" style={{ color: brand.colors.accent }}>{metaParts.join(' · ')}</div>
             )}
           </div>
         )}
 
-        <div className="mt-10 text-center text-xs text-slate-400">
-          {brand.name} · {brand.tagline}
+        <div className="p-10">
+          {/* Schedule */}
+          <div className="flex items-center gap-3 mb-6">
+            <span className="h-6 w-1.5 rounded-full" style={{ background: brand.colors.primary }} />
+            <h2 className="text-xl font-bold" style={{ color: brand.colors.dark }}>הלו״ז ליום</h2>
+          </div>
+
+          <div className="space-y-6">
+            {items.map((it) => (
+              <div key={it.id} className="print-break">
+                <div className="flex gap-5">
+                  {/* Photo (or branded placeholder) */}
+                  {!it.options?.length && it.photos?.[0] ? (
+                    <img src={it.photos[0]} alt="" className="h-28 w-28 flex-shrink-0 rounded-xl object-cover shadow-sm" />
+                  ) : !it.options?.length ? (
+                    <div
+                      className="h-28 w-28 flex-shrink-0 rounded-xl"
+                      style={{ background: brand.colors.soft }}
+                    />
+                  ) : null}
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <div className="text-sm font-bold" style={{ color: brand.colors.primary }}>
+                        <bdi>{timingLabel(it) || '—'}</bdi>
+                        {it.approx_duration_hours ? (
+                          <span className="mr-2 font-normal text-slate-400">· {formatDuration(it.approx_duration_hours)}</span>
+                        ) : null}
+                      </div>
+                      {showPrices && !it.options?.length && formatPrice(it.price) && (
+                        <div className="text-sm font-semibold whitespace-nowrap">{formatPrice(it.price)}</div>
+                      )}
+                      {showPrices && it.options?.length > 0 && (() => {
+                        const { low: lo, high: hi } = priceRange(it);
+                        return <div className="text-sm font-semibold whitespace-nowrap">{formatRange(lo, hi)}</div>;
+                      })()}
+                    </div>
+
+                    <div className="mt-0.5 text-lg font-bold" style={{ color: brand.colors.dark }}>{it.title}</div>
+                    {it.description && <div className="mt-1 text-sm text-slate-500 break-words">{it.description}</div>}
+                    {(it.contact_name || it.contact_phone) && (
+                      <div className="mt-2 text-xs text-slate-400">
+                        <span className="font-medium text-slate-500">איש קשר: </span>
+                        {[it.contact_name, it.contact_phone].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {it.options?.length > 0 && (
+                  <div className="mt-4 pr-1">
+                    <div className="text-xs font-medium text-slate-400 mb-3">בחירה בין:</div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {it.options.map((o) => (
+                        <div key={o.id} className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm">
+                          {o.photos?.[0] && (
+                            <img src={o.photos[0]} alt="" className="h-24 w-full object-cover" />
+                          )}
+                          <div className="p-3">
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="font-semibold" style={{ color: brand.colors.dark }}>{o.title}</div>
+                              {showPrices && formatPrice(o.price) && (
+                                <div className="text-sm font-semibold whitespace-nowrap">{formatPrice(o.price)}</div>
+                              )}
+                            </div>
+                            {o.description && <div className="mt-1 text-sm text-slate-500 break-words">{o.description}</div>}
+                            {(o.contact_name || o.contact_phone) && (
+                              <div className="mt-1 text-xs text-slate-400">
+                                <span className="font-medium text-slate-500">איש קשר: </span>
+                                {[o.contact_name, o.contact_phone].filter(Boolean).join(' · ')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Closing — investment per person + CTA */}
+          <div className="mt-10 rounded-2xl p-6" style={{ background: brand.colors.soft }}>
+            {showPrices && high > 0 ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-lg" style={{ color: brand.colors.dark }}>השקעה לאדם</span>
+                  <span className="font-extrabold text-xl" style={{ color: brand.colors.primary }}>
+                    {formatRange(low, high)}
+                  </span>
+                </div>
+                {event.group_size > 0 && (
+                  <div className="mt-1 flex items-center justify-between text-sm text-slate-500">
+                    <span>סה״כ לקבוצה (×{event.group_size})</span>
+                    <span className="font-medium">{formatRange(low * event.group_size, high * event.group_size)}</span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-lg" style={{ color: brand.colors.dark }}>תקציב משוער לאדם</span>
+                {formatPrice(event.budget) && (
+                  <span className="font-extrabold text-xl" style={{ color: brand.colors.primary }}>
+                    {formatPrice(event.budget)}
+                  </span>
+                )}
+              </div>
+            )}
+            <div className="mt-4 text-center font-semibold" style={{ color: brand.colors.primary }}>
+              נשמח לתאם ולצאת לדרך
+            </div>
+          </div>
+
+          <div className="mt-8 text-center text-xs text-slate-400">
+            {brand.name} · {brand.tagline}
+          </div>
         </div>
       </div>
     </div>
