@@ -5,6 +5,7 @@
 const BRAND = {
   name: 'star הפקות',
   tagline: 'בונים ימי כיף וימי גיבוש',
+  contact: 'gocarisrael@gmail.com',
   primary: '#e00f19',
   dark: '#141414',
 };
@@ -231,7 +232,26 @@ function scheduleSection(rawItems, { showPrices, photoMap, groupSize, totalsLabe
   return `<div class="items">${itemsHtml}</div>${totalsHtml}`;
 }
 
-export function proposalHtml(event, { prices, photos, logo } = { prices: false, photos: {}, logo: null }) {
+// Find the first usable hero photo embedded in the photo map. Prefers
+// event.cover_photo; otherwise falls back to the first activity's first photo
+// (in schedule order). Returns a data URI or null. The hero must be a base64
+// data URI (Puppeteer has no base URL) — generate.js embeds cover_photo into the
+// photo map and passes it through here.
+function pickHero(event, photoMap) {
+  if (event.cover_photo && photoMap[event.cover_photo]) return photoMap[event.cover_photo];
+  const sorted = sortByStart(event.items || []);
+  for (const it of sorted) {
+    const p = it.photos?.[0];
+    if (p && photoMap[p]) return photoMap[p];
+    for (const o of it.options || []) {
+      const op = o.photos?.[0];
+      if (op && photoMap[op]) return photoMap[op];
+    }
+  }
+  return null;
+}
+
+export function proposalHtml(event, { prices, photos, logo, cover } = { prices: false, photos: {}, logo: null, cover: null }) {
   const photoMap = photos || {};
   const logoUri = logo || null;
   const showPrices = Boolean(prices);
@@ -239,17 +259,55 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   const optionsMode = event.options_mode === true;
   const groupSize = event.group_size > 0 ? event.group_size : 0;
 
-  // Middot meta strip under the title: {date} · {N} משתתפים · {location}
-  const metaParts = [
-    whenLabel(event) ? `<bdi>${esc(whenLabel(event))}</bdi>` : '',
+  // Hero image for the cover band: explicit `cover` data URI wins, else derive
+  // one from the photo map (cover_photo → first activity photo).
+  const heroUri = cover || pickHero(event, photoMap);
+
+  // Cover meta line: client · {N} משתתפים · month/date · location
+  const coverMetaParts = [
+    event.client_name ? esc(event.client_name) : '',
     event.group_size ? `<bdi>${esc(event.group_size)}</bdi> משתתפים` : '',
+    whenLabel(event) ? `<bdi>${esc(whenLabel(event))}</bdi>` : '',
     event.location ? esc(event.location) : '',
   ].filter(Boolean);
-  const metaHtml = metaParts.length
-    ? `<div class="meta">${metaParts.join('<span class="meta-dot">·</span>')}</div>`
+  const coverMetaHtml = coverMetaParts.length
+    ? `<div class="cover-meta">${coverMetaParts.join('<span class="meta-dot">·</span>')}</div>`
     : '';
 
+  // The wordmark lockup, reused on the photo hero (white) and branded cover.
+  const wordmarkLockup = (variant) => `
+    <div class="cover-brand cover-brand--${variant}">
+      ${logoUri ? `<img class="cover-logo" src="${logoUri}" alt="" />` : ''}
+      <span class="cover-word">${esc(BRAND.name)}</span>
+    </div>`;
+
+  // COVER / HERO. With a photo → full-width band, dark bottom gradient, the
+  // wordmark top corner and the title + meta bottom-aligned in white. With NO
+  // photo at all → a tasteful branded ink/red band (never a broken hero).
+  const coverHtml = heroUri
+    ? `
+      <div class="cover cover--photo">
+        <img class="cover-img" src="${heroUri}" alt="" />
+        <div class="cover-shade"></div>
+        ${wordmarkLockup('photo')}
+        <div class="cover-text">
+          <h1 class="cover-title">${esc(event.title || '')}</h1>
+          ${coverMetaHtml}
+        </div>
+      </div>`
+    : `
+      <div class="cover cover--brand">
+        ${wordmarkLockup('brand')}
+        <div class="cover-text">
+          <h1 class="cover-title">${esc(event.title || '')}</h1>
+          <div class="cover-tag">${esc(BRAND.tagline)}</div>
+          ${coverMetaHtml}
+        </div>
+      </div>`;
+
   // Body: single schedule (unchanged) OR two stacked, labeled option sections.
+  // In prices mode the per-section totals stay inline; in no-prices mode totals
+  // are suppressed and replaced by the single closing investment band below.
   let bodyHtml;
   if (optionsMode) {
     const aItems = allItems.filter((it) => it.option !== 'B');
@@ -270,19 +328,67 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
       ${scheduleSection(allItems, { showPrices, photoMap, groupSize })}`;
   }
 
-  // When prices are hidden, surface the planned per-person goal budget instead
-  // of real totals. event.budget is already a per-person ("לראש") figure.
-  // Option-independent → shown once at the end in both modes.
-  const budgetNum = Number(event.budget);
-  const budgetHtml = !showPrices && Number.isFinite(budgetNum) && budgetNum > 0
-    ? `
-      <div class="totals budget">
-        <div class="totals-row">
-          <span class="totals-label">תקציב משוער לאדם</span>
-          <span class="totals-value"><bdi>₪${esc(budgetNum.toLocaleString('he-IL'))}</bdi></span>
-        </div>
-      </div>`
-    : '';
+  // --- Closing: investment band + CTA, kept tidy and paired ---------------
+  // The closing band is the confident "investment per person" moment near the
+  // end. With prices on, it summarises the overall per-person + group total.
+  // Without prices, it surfaces the planned per-person goal budget instead
+  // (event.budget is already a per-person "לראש" figure). The band and the warm
+  // CTA are wrapped TOGETHER in one .closing block with break-inside:avoid, so
+  // the budget band can never orphan onto a page by itself or sit half-cut — if
+  // it must move to a new page it carries the CTA with it.
+  let closingBandHtml = '';
+  if (showPrices) {
+    // Overall per-person investment across the whole day (single mode) — in
+    // options mode each section already shows its own total, so the closing
+    // band leads with a headline rather than a duplicate number.
+    if (!optionsMode) {
+      const { low, high } = total(allItems);
+      if (high > 0) {
+        closingBandHtml = `
+          <div class="invest">
+            <div class="invest-cap">ההשקעה ליום</div>
+            <div class="invest-row">
+              <span class="invest-label">מחיר לאדם</span>
+              <span class="invest-value"><bdi>${esc(formatRange(low, high))}</bdi></span>
+            </div>
+            ${groupSize > 0 ? `
+              <div class="invest-group">
+                <span>סה״כ לקבוצה (×<bdi>${esc(groupSize)}</bdi>)</span>
+                <span class="invest-group-value"><bdi>${esc(formatRange(low * groupSize, high * groupSize))}</bdi></span>
+              </div>` : ''}
+          </div>`;
+      }
+    }
+  } else {
+    const budgetNum = Number(event.budget);
+    if (Number.isFinite(budgetNum) && budgetNum > 0) {
+      closingBandHtml = `
+        <div class="invest budget">
+          <div class="invest-cap">ההשקעה ליום</div>
+          <div class="invest-row">
+            <span class="invest-label">תקציב משוער לאדם</span>
+            <span class="invest-value"><bdi>₪${esc(budgetNum.toLocaleString('he-IL'))}</bdi></span>
+          </div>
+        </div>`;
+    }
+  }
+
+  // The warm closing CTA + contact — always present, paired with the band.
+  const ctaHtml = `
+    <div class="cta">
+      <div class="cta-line">נשמח לתאם ולצאת לדרך 🎉</div>
+      <div class="cta-contact">
+        <span class="cta-brand">${esc(BRAND.name)}</span>
+        <span class="meta-dot">·</span>
+        <bdi>${esc(BRAND.contact)}</bdi>
+      </div>
+    </div>`;
+
+  const closingHtml = `
+    <div class="closing">
+      ${closingBandHtml}
+      ${ctaHtml}
+    </div>`;
 
   return `<!DOCTYPE html>
 <html lang="he" dir="rtl">
@@ -295,10 +401,11 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
 <title>${esc(event.title || 'הצעה')}</title>
 <style>
   :root {
-    --brand:#e00f19; --brand-wash:#fdecec;
+    --brand:#e00f19; --brand-deep:#b30c14; --brand-wash:#fdecec;
     --ink:#141414; --ink-2:#3f3f43; --ink-3:#6b6b70; --ink-4:#9a9aa0;
-    --line:#e9e9ec; --line-2:#f3f3f5; --panel:#fafafa;
+    --line:#e9e9ec; --line-2:#f3f3f5; --panel:#faf8f6; --paper:#fdfcfb;
   }
+  @page { margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
@@ -309,37 +416,62 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
     print-color-adjust: exact;
   }
   bdi { font-variant-numeric: tabular-nums; }
-  .page { max-width: 760px; margin: 0 auto; background: #fff; padding: 44px 40px; }
+  .page { background: var(--paper); padding: 40px 44px 48px; }
 
-  /* --- Header: black ink wordmark + a single small red "signature" tick --- */
-  .header {
-    display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 1px solid var(--line); padding-bottom: 18px; margin-bottom: 28px;
-    break-inside: avoid; page-break-inside: avoid;
+  /* --- COVER / HERO -------------------------------------------------------
+     A full-width hero band with a photo + dark bottom gradient, the wordmark
+     top-corner (white) and the day title + meta bottom-aligned (white). When
+     no photo exists at all, a branded ink/red band stands in. The cover is a
+     self-contained block so it leads page 1 cleanly. */
+  .cover {
+    position: relative; height: 268px; border-radius: 16px; overflow: hidden;
+    margin: 0 0 30px; break-inside: avoid; page-break-inside: avoid;
+    box-shadow: 0 1px 0 rgba(0,0,0,.04);
   }
-  .brand { display: flex; align-items: center; gap: 12px; }
-  .logo { height: 46px; width: auto; object-fit: contain; }
-  .wordmark {
-    font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1.05;
-    display: flex; align-items: center; gap: 8px;
+  .cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .cover-shade {
+    position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(8,8,10,.86) 0%, rgba(8,8,10,.55) 32%, rgba(8,8,10,.05) 62%, rgba(8,8,10,0) 100%);
   }
-  .tick { display: inline-block; width: 18px; height: 3px; border-radius: 2px; background: var(--brand); }
-  .tagline { font-size: 11px; color: var(--ink-4); margin-top: 5px; letter-spacing: .02em; }
-
-  /* --- Title + middot meta strip --- */
-  .title {
+  .cover--brand {
+    background:
+      radial-gradient(120% 140% at 88% 8%, rgba(224,15,25,.55) 0%, rgba(224,15,25,0) 55%),
+      linear-gradient(135deg, #1c1c1f 0%, var(--ink) 60%, #050506 100%);
+  }
+  .cover--brand::after {
+    content: ""; position: absolute; inset-inline-start: 0; bottom: 0;
+    width: 100%; height: 5px; background: var(--brand);
+  }
+  .cover-brand {
+    position: absolute; top: 22px; inset-inline-start: 26px;
+    display: flex; align-items: center; gap: 11px; z-index: 2;
+  }
+  .cover-logo {
+    height: 40px; width: auto; object-fit: contain; border-radius: 8px;
+    background: #fff; padding: 4px; box-shadow: 0 2px 10px rgba(0,0,0,.25);
+  }
+  .cover-word { font-size: 19px; font-weight: 800; color: #fff; letter-spacing: .01em; text-shadow: 0 1px 6px rgba(0,0,0,.4); }
+  .cover-text { position: absolute; inset-inline: 28px; bottom: 24px; z-index: 2; }
+  .cover-title {
     font-family: 'Frank Ruhl Libre', 'Heebo', serif;
-    font-size: 30px; font-weight: 700; color: var(--ink); margin: 0 0 8px; line-height: 1.15;
-    break-after: avoid; page-break-after: avoid;
+    font-size: 40px; font-weight: 700; line-height: 1.08; color: #fff; margin: 0;
+    text-shadow: 0 2px 14px rgba(0,0,0,.45);
   }
-  .meta { font-size: 13px; color: var(--ink-3); margin: 0 0 26px; }
+  .cover-tag { color: rgba(255,255,255,.86); font-size: 14px; margin-top: 8px; letter-spacing: .02em; }
+  .cover-meta {
+    margin-top: 11px; font-size: 13.5px; font-weight: 500;
+    color: rgba(255,255,255,.92); text-shadow: 0 1px 8px rgba(0,0,0,.5);
+  }
+  .cover-meta .meta-dot { color: rgba(255,255,255,.55); }
   .meta-dot { color: var(--ink-4); margin: 0 8px; }
 
   .sched {
-    font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
-    color: var(--ink-3); margin: 0 0 16px;
+    font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--brand); margin: 4px 0 20px;
     break-after: avoid; page-break-after: avoid;
+    display: flex; align-items: center; gap: 12px;
   }
+  .sched::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 
   /* --- Timeline: hairline spine on the start (RTL-right) edge + red dots ---
      The spine is drawn PER ITEM (each .item paints its own segment via
@@ -366,37 +498,49 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   .item:last-child::before { bottom: auto; height: 6px; }
   .item:last-child { border-bottom: 0; margin-bottom: 0; }
   .dot {
-    position: absolute; inset-inline-start: 0; top: 5px;
-    width: 8px; height: 8px; border-radius: 50%;
-    background: var(--brand); box-shadow: 0 0 0 3px #fff, 0 0 0 4px var(--line);
+    position: absolute; inset-inline-start: -1px; top: 5px;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--brand); box-shadow: 0 0 0 3px #fff, 0 0 0 4px rgba(224,15,25,.22);
   }
-  .item-row { display: flex; gap: 16px; align-items: flex-start; }
-  .item-time { min-width: 78px; }
-  .time-label { font-size: 15px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .item-row { display: flex; gap: 18px; align-items: flex-start; }
+  .item-time { min-width: 70px; padding-top: 1px; }
+  .time-label { font-size: 16px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
   .time-dur { font-size: 11px; color: var(--ink-4); margin-top: 2px; }
   .item-photo {
-    height: 80px; width: 120px; border-radius: 10px; object-fit: cover; flex-shrink: 0;
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
+    height: 104px; width: 156px; border-radius: 12px; object-fit: cover; flex-shrink: 0;
+    box-shadow: 0 2px 10px rgba(0,0,0,.10), inset 0 0 0 1px rgba(0,0,0,.05);
     break-inside: avoid; page-break-inside: avoid;
   }
   /* No image should ever split across a page break. */
   img { break-inside: avoid; page-break-inside: avoid; }
-  .item-main { flex: 1; min-width: 0; }
-  .item-title { font-size: 16px; font-weight: 600; color: var(--ink); }
-  .item-desc { font-size: 13px; line-height: 1.6; color: var(--ink-2); word-break: break-word; margin-top: 3px; }
-  .item-contact { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+  .item-main { flex: 1; min-width: 0; padding-top: 1px; }
+  .item-title { font-size: 18px; font-weight: 700; color: var(--ink); line-height: 1.25; }
+  .item-desc { font-size: 13px; line-height: 1.62; color: var(--ink-2); word-break: break-word; margin-top: 4px; }
+  .item-contact { font-size: 12px; color: var(--ink-3); margin-top: 7px; }
   .contact-label { font-size: 10.5px; letter-spacing: .04em; color: var(--ink-4); }
-  .item-price { font-size: 13px; font-weight: 600; white-space: nowrap; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .item-price {
+    font-size: 14px; font-weight: 700; white-space: nowrap; color: var(--ink);
+    font-variant-numeric: tabular-nums; align-self: flex-start;
+    background: var(--brand-wash); color: var(--brand-deep);
+    padding: 4px 10px; border-radius: 999px;
+  }
 
   /* --- Options / choice block --- */
-  .options { margin-top: 14px; padding-inline-start: 94px; break-inside: avoid; page-break-inside: avoid; }
+  .options {
+    margin-top: 16px; padding: 14px 16px; padding-inline-start: 88px;
+    background: linear-gradient(180deg, #fff 0%, var(--panel) 100%);
+    border: 1px solid var(--line); border-radius: 14px;
+    break-inside: avoid; page-break-inside: avoid;
+  }
   .options-label {
-    font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--ink-4); margin-bottom: 8px;
+    font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--brand); margin-bottom: 10px;
     break-after: avoid; page-break-after: avoid;
   }
   .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .opt {
-    border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; gap: 12px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; gap: 12px; background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
     break-inside: avoid; page-break-inside: avoid;
   }
   .opt-photo {
@@ -411,15 +555,15 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   .opt-desc { font-size: 13px; line-height: 1.6; color: var(--ink-2); word-break: break-word; margin-top: 2px; }
   .opt-contact { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
 
-  /* --- Totals / budget band: soft-red wash, 2px red top edge, red value --- */
+  /* --- Inline per-section totals (prices mode, inside the schedule) -------- */
   .totals {
-    margin-top: 28px; padding: 16px 18px; border-radius: 12px;
-    background: var(--brand-wash); border-top: 2px solid var(--brand);
+    margin-top: 24px; padding: 14px 18px; border-radius: 12px;
+    background: var(--brand-wash); border-inline-start: 4px solid var(--brand);
     break-inside: avoid; page-break-inside: avoid;
   }
   .totals-row { display: flex; justify-content: space-between; align-items: baseline; }
-  .totals-label { font-weight: 700; font-size: 15px; color: var(--ink); }
-  .totals-value { font-weight: 800; font-size: 20px; color: var(--brand); font-variant-numeric: tabular-nums; }
+  .totals-label { font-weight: 700; font-size: 14px; color: var(--ink); }
+  .totals-value { font-weight: 800; font-size: 19px; color: var(--brand-deep); font-variant-numeric: tabular-nums; }
   .totals-group { display: flex; justify-content: space-between; align-items: baseline; color: var(--ink-3); font-size: 13px; margin-top: 8px; }
   .totals-group-value { font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 
@@ -428,40 +572,61 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   .option-section:last-of-type { margin-bottom: 0; }
   .option-head {
     font-family: 'Frank Ruhl Libre', 'Heebo', serif;
-    font-size: 20px; font-weight: 700; color: var(--ink);
-    padding: 8px 14px; margin: 0 0 18px; border-radius: 10px;
+    font-size: 21px; font-weight: 700; color: var(--ink);
+    padding: 9px 16px; margin: 0 0 20px; border-radius: 10px;
     background: var(--brand-wash); border-inline-start: 4px solid var(--brand);
     break-inside: avoid; page-break-inside: avoid;
     break-after: avoid; page-break-after: avoid;
   }
 
-  /* --- Footer: slim, centered, hairline above --- */
-  .footer {
-    margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line);
-    text-align: center; font-size: 10px; color: var(--ink-4); letter-spacing: .02em;
+  /* --- CLOSING: investment band + CTA, paired so the band never orphans ----
+     .closing wraps the band and CTA together with break-inside:avoid; if it
+     can't fit it moves to the next page as a unit — the no-prices budget band
+     never strands or sits half-cut on its own. */
+  .closing {
+    margin-top: 40px; break-inside: avoid; page-break-inside: avoid;
   }
+  .invest {
+    padding: 24px 26px; border-radius: 16px; color: #fff;
+    background:
+      radial-gradient(120% 160% at 92% 0%, rgba(224,15,25,.6) 0%, rgba(224,15,25,0) 58%),
+      linear-gradient(135deg, #1f1f22 0%, var(--ink) 62%, #050506 100%);
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .invest-cap {
+    font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase;
+    color: rgba(255,255,255,.6); margin-bottom: 10px;
+  }
+  .invest-row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+  .invest-label { font-weight: 600; font-size: 18px; color: #fff; }
+  .invest-value { font-weight: 800; font-size: 34px; color: #fff; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .invest-group {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.16);
+    color: rgba(255,255,255,.78); font-size: 13.5px;
+  }
+  .invest-group-value { font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+
+  .cta {
+    margin-top: 16px; padding: 22px 24px; border-radius: 16px; text-align: center;
+    background: var(--paper); border: 1px solid var(--line);
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .cta-line {
+    font-family: 'Frank Ruhl Libre', 'Heebo', serif;
+    font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 8px;
+  }
+  .cta-contact { font-size: 13.5px; color: var(--ink-3); }
+  .cta-brand { font-weight: 700; color: var(--ink); }
 </style>
 </head>
 <body>
   <div class="page">
-    <div class="header">
-      <div class="brand">
-        ${logoUri ? `<img class="logo" src="${logoUri}" alt="" />` : ''}
-        <div>
-          <div class="wordmark"><span class="tick" aria-hidden="true"></span>${esc(BRAND.name)}</div>
-          <div class="tagline">${esc(BRAND.tagline)}</div>
-        </div>
-      </div>
-    </div>
-
-    <h1 class="title">${esc(event.title || '')}</h1>
-    ${metaHtml}
+    ${coverHtml}
 
     ${bodyHtml}
 
-    ${budgetHtml}
-
-    <div class="footer">${esc(BRAND.name)} · ${esc(BRAND.tagline)}</div>
+    ${closingHtml}
   </div>
 </body>
 </html>`;
