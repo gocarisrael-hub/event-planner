@@ -7,7 +7,7 @@ import { formatDuration, formatPrice, formatRange, priceRange, sortByStart, timi
 export default function ProposalPreview() {
   const { id } = useParams();
   const [event, setEvent] = useState(null);
-  const [showPrices, setShowPrices] = useState(true);
+  const [showPrices, setShowPrices] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
 
@@ -63,11 +63,11 @@ export default function ProposalPreview() {
         <div className="flex items-center gap-2 mr-auto">
           {error && <span className="text-sm text-red-500">{error}</span>}
           {pending && <span className="text-sm text-slate-400">יוצר PDF…</span>}
-          <button onClick={() => downloadPdf(true)} disabled={pending} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
-            הורד PDF עם מחירים
-          </button>
-          <button onClick={() => downloadPdf(false)} disabled={pending} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={() => downloadPdf(false)} disabled={pending} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
             הורד PDF בלי מחירים
+          </button>
+          <button onClick={() => downloadPdf(true)} disabled={pending} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
+            הורד PDF עם מחירים
           </button>
         </div>
       </div>

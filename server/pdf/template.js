@@ -315,6 +315,7 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   .header {
     display: flex; align-items: center; justify-content: space-between;
     border-bottom: 1px solid var(--line); padding-bottom: 18px; margin-bottom: 28px;
+    break-inside: avoid; page-break-inside: avoid;
   }
   .brand { display: flex; align-items: center; gap: 12px; }
   .logo { height: 46px; width: auto; object-fit: contain; }
@@ -329,6 +330,7 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   .title {
     font-family: 'Frank Ruhl Libre', 'Heebo', serif;
     font-size: 30px; font-weight: 700; color: var(--ink); margin: 0 0 8px; line-height: 1.15;
+    break-after: avoid; page-break-after: avoid;
   }
   .meta { font-size: 13px; color: var(--ink-3); margin: 0 0 26px; }
   .meta-dot { color: var(--ink-4); margin: 0 8px; }
@@ -336,19 +338,32 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   .sched {
     font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
     color: var(--ink-3); margin: 0 0 16px;
+    break-after: avoid; page-break-after: avoid;
   }
 
-  /* --- Timeline: hairline spine on the start (RTL-right) edge + red dots --- */
+  /* --- Timeline: hairline spine on the start (RTL-right) edge + red dots ---
+     The spine is drawn PER ITEM (each .item paints its own segment via
+     ::before) instead of one continuous absolutely-positioned line over the
+     whole .items container. A single container-spanning line would not
+     paginate — it would get clipped/misaligned across A4 page breaks — so each
+     activity carries its own segment + dot, which survives page breaks cleanly
+     while keeping the same hairline-spine + red-dot look on a single page. */
   .items { position: relative; }
-  .items::before {
-    content: ""; position: absolute; top: 6px; bottom: 6px;
-    inset-inline-start: 5px; width: 2px; background: var(--line);
-  }
   .item {
     position: relative; padding-inline-start: 26px;
     padding-bottom: 18px; margin-bottom: 18px;
-    border-bottom: 1px solid var(--line-2); page-break-inside: avoid;
+    border-bottom: 1px solid var(--line-2);
+    break-inside: avoid; page-break-inside: avoid;
   }
+  /* Per-item spine segment: a vertical hairline on the start edge spanning the
+     full height of this item, so the spine reconstructs continuously down the
+     page yet never spans (and thus never gets cut at) a page boundary. */
+  .item::before {
+    content: ""; position: absolute; inset-inline-start: 5px;
+    top: 0; bottom: 0; width: 2px; background: var(--line);
+  }
+  .item:first-child::before { top: 6px; }
+  .item:last-child::before { bottom: auto; height: 6px; }
   .item:last-child { border-bottom: 0; margin-bottom: 0; }
   .dot {
     position: absolute; inset-inline-start: 0; top: 5px;
@@ -362,7 +377,10 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   .item-photo {
     height: 80px; width: 120px; border-radius: 10px; object-fit: cover; flex-shrink: 0;
     box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
+    break-inside: avoid; page-break-inside: avoid;
   }
+  /* No image should ever split across a page break. */
+  img { break-inside: avoid; page-break-inside: avoid; }
   .item-main { flex: 1; min-width: 0; }
   .item-title { font-size: 16px; font-weight: 600; color: var(--ink); }
   .item-desc { font-size: 13px; line-height: 1.6; color: var(--ink-2); word-break: break-word; margin-top: 3px; }
@@ -371,13 +389,20 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   .item-price { font-size: 13px; font-weight: 600; white-space: nowrap; color: var(--ink); font-variant-numeric: tabular-nums; }
 
   /* --- Options / choice block --- */
-  .options { margin-top: 14px; padding-inline-start: 94px; }
-  .options-label { font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--ink-4); margin-bottom: 8px; }
+  .options { margin-top: 14px; padding-inline-start: 94px; break-inside: avoid; page-break-inside: avoid; }
+  .options-label {
+    font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--ink-4); margin-bottom: 8px;
+    break-after: avoid; page-break-after: avoid;
+  }
   .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .opt { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; gap: 12px; background: var(--panel); }
+  .opt {
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; gap: 12px; background: var(--panel);
+    break-inside: avoid; page-break-inside: avoid;
+  }
   .opt-photo {
     height: 64px; width: 64px; border-radius: 10px; object-fit: cover; flex-shrink: 0;
     box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
+    break-inside: avoid; page-break-inside: avoid;
   }
   .opt-body { flex: 1; min-width: 0; }
   .opt-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
@@ -390,7 +415,7 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
   .totals {
     margin-top: 28px; padding: 16px 18px; border-radius: 12px;
     background: var(--brand-wash); border-top: 2px solid var(--brand);
-    page-break-inside: avoid;
+    break-inside: avoid; page-break-inside: avoid;
   }
   .totals-row { display: flex; justify-content: space-between; align-items: baseline; }
   .totals-label { font-weight: 700; font-size: 15px; color: var(--ink); }
@@ -406,6 +431,8 @@ export function proposalHtml(event, { prices, photos, logo } = { prices: false, 
     font-size: 20px; font-weight: 700; color: var(--ink);
     padding: 8px 14px; margin: 0 0 18px; border-radius: 10px;
     background: var(--brand-wash); border-inline-start: 4px solid var(--brand);
+    break-inside: avoid; page-break-inside: avoid;
+    break-after: avoid; page-break-after: avoid;
   }
 
   /* --- Footer: slim, centered, hairline above --- */
