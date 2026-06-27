@@ -63,7 +63,7 @@ test('goal budget per person shown when prices=false and budget positive', () =>
     { title: 'א', budget: 250, items: [] },
     { prices: false, photos: {}, logo: null },
   );
-  assert.ok(html.includes('תקציב משוער לאדם'), 'expected budget label');
+  assert.ok(html.includes('תקציב לאדם'), 'expected budget label');
   assert.ok(html.includes('250'), 'expected budget value');
 });
 
@@ -72,7 +72,7 @@ test('goal budget NOT shown when prices=true', () => {
     { title: 'א', budget: 250, items: [] },
     { prices: true, photos: {}, logo: null },
   );
-  assert.ok(!html.includes('תקציב משוער לאדם'), 'budget must not appear when prices=true');
+  assert.ok(!html.includes('תקציב לאדם'), 'budget must not appear when prices=true');
 });
 
 test('goal budget NOT shown when budget is missing or non-positive', () => {
@@ -81,7 +81,7 @@ test('goal budget NOT shown when budget is missing or non-positive', () => {
       { title: 'א', budget, items: [] },
       { prices: false, photos: {}, logo: null },
     );
-    assert.ok(!html.includes('תקציב משוער לאדם'), `budget must not appear for ${budget}`);
+    assert.ok(!html.includes('תקציב לאדם'), `budget must not appear for ${budget}`);
   }
 });
 

@@ -366,7 +366,7 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
         <div class="invest budget">
           <div class="invest-cap">ההשקעה ליום</div>
           <div class="invest-row">
-            <span class="invest-label">תקציב משוער לאדם</span>
+            <span class="invest-label">תקציב לאדם</span>
             <span class="invest-value"><bdi>₪${esc(budgetNum.toLocaleString('he-IL'))}</bdi></span>
           </div>
         </div>`;
@@ -416,7 +416,7 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
     print-color-adjust: exact;
   }
   bdi { font-variant-numeric: tabular-nums; }
-  .page { background: var(--paper); padding: 40px 44px 48px; }
+  .page { background: var(--paper); padding: 32px 40px 36px; }
 
   /* --- COVER / HERO -------------------------------------------------------
      A full-width hero band with a photo + dark bottom gradient, the wordmark
@@ -424,8 +424,8 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
      no photo exists at all, a branded ink/red band stands in. The cover is a
      self-contained block so it leads page 1 cleanly. */
   .cover {
-    position: relative; height: 268px; border-radius: 16px; overflow: hidden;
-    margin: 0 0 30px; break-inside: avoid; page-break-inside: avoid;
+    position: relative; height: 210px; border-radius: 14px; overflow: hidden;
+    margin: 0 0 24px; break-inside: avoid; page-break-inside: avoid;
   }
   .cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   /* Solid dark scrim on the bottom half for white-text legibility. A flat
@@ -481,7 +481,7 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
   .items { position: relative; }
   .item {
     position: relative; padding-inline-start: 26px;
-    padding-bottom: 18px; margin-bottom: 18px;
+    padding-bottom: 14px; margin-bottom: 14px;
     border-bottom: 1px solid var(--line-2);
     break-inside: avoid; page-break-inside: avoid;
   }
@@ -517,10 +517,8 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
   .item-contact { font-size: 12px; color: var(--ink-3); margin-top: 7px; }
   .contact-label { font-size: 10.5px; letter-spacing: .04em; color: var(--ink-4); }
   .item-price {
-    font-size: 14px; font-weight: 700; white-space: nowrap; color: var(--ink);
-    font-variant-numeric: tabular-nums; align-self: flex-start;
-    background: var(--brand-wash); color: var(--brand-deep);
-    padding: 4px 10px; border-radius: 999px;
+    font-size: 15px; font-weight: 800; white-space: nowrap;
+    color: var(--brand-deep); font-variant-numeric: tabular-nums; align-self: flex-start;
   }
 
   /* --- Options / choice block --- */
@@ -554,8 +552,8 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
 
   /* --- Inline per-section totals (prices mode, inside the schedule) -------- */
   .totals {
-    margin-top: 24px; padding: 14px 18px; border-radius: 12px;
-    background: var(--brand-wash); border-inline-start: 4px solid var(--brand);
+    margin-top: 20px; padding: 14px 0 0;
+    border-top: 2px solid var(--brand);
     break-inside: avoid; page-break-inside: avoid;
   }
   .totals-row { display: flex; justify-content: space-between; align-items: baseline; }
@@ -569,9 +567,9 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
   .option-section:last-of-type { margin-bottom: 0; }
   .option-head {
     font-family: 'Frank Ruhl Libre', 'Heebo', serif;
-    font-size: 21px; font-weight: 700; color: var(--ink);
-    padding: 9px 16px; margin: 0 0 20px; border-radius: 10px;
-    background: var(--brand-wash); border-inline-start: 4px solid var(--brand);
+    font-size: 22px; font-weight: 700; color: var(--ink);
+    padding: 0 0 8px; margin: 0 0 18px;
+    border-bottom: 2px solid var(--brand);
     break-inside: avoid; page-break-inside: avoid;
     break-after: avoid; page-break-after: avoid;
   }
@@ -580,32 +578,33 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
      .closing wraps the band and CTA together with break-inside:avoid; if it
      can't fit it moves to the next page as a unit — the no-prices budget band
      never strands or sits half-cut on its own. */
-  .closing {
-    margin-top: 40px; break-inside: avoid; page-break-inside: avoid;
-  }
-  /* Flat dark fill (no gradient) + a solid red top edge — prints clean. */
+  /* No avoid on the wrapper — let the closing begin at the bottom of a page
+     instead of forcing the whole block onto a fresh (near-empty) page. The
+     .invest band keeps its own break-inside:avoid so the budget never splits. */
+  .closing { margin-top: 28px; }
+  /* Open editorial block — no filled box. A strong red top rule + dark text +
+     a big red value reads premium and prints perfectly clean. */
   .invest {
-    padding: 24px 26px; border-radius: 16px; color: #fff;
-    background: var(--ink); border-top: 5px solid var(--brand);
+    padding: 18px 4px 0; border-top: 3px solid var(--brand);
     break-inside: avoid; page-break-inside: avoid;
   }
   .invest-cap {
     font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase;
-    color: rgba(255,255,255,.6); margin-bottom: 10px;
+    color: var(--ink-4); margin-bottom: 8px;
   }
   .invest-row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
-  .invest-label { font-weight: 600; font-size: 18px; color: #fff; }
-  .invest-value { font-weight: 800; font-size: 34px; color: #fff; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .invest-label { font-weight: 700; font-size: 18px; color: var(--ink); }
+  .invest-value { font-weight: 800; font-size: 34px; color: var(--brand-deep); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
   .invest-group {
     display: flex; justify-content: space-between; align-items: baseline;
-    margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.16);
-    color: rgba(255,255,255,.78); font-size: 13.5px;
+    margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);
+    color: var(--ink-3); font-size: 13.5px;
   }
-  .invest-group-value { font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+  .invest-group-value { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
 
   .cta {
-    margin-top: 16px; padding: 22px 24px; border-radius: 16px; text-align: center;
-    background: var(--paper); border: 1px solid var(--line);
+    margin-top: 22px; padding: 18px 4px 0; text-align: center;
+    border-top: 1px solid var(--line);
     break-inside: avoid; page-break-inside: avoid;
   }
   .cta-line {
