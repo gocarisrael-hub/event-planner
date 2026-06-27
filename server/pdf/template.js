@@ -426,18 +426,16 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
   .cover {
     position: relative; height: 268px; border-radius: 16px; overflow: hidden;
     margin: 0 0 30px; break-inside: avoid; page-break-inside: avoid;
-    box-shadow: 0 1px 0 rgba(0,0,0,.04);
   }
   .cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  /* Solid dark scrim on the bottom half for white-text legibility. A flat
+     layer (not a multi-stop gradient) prints clean in Chromium — gradients band
+     into gray smears in print. */
   .cover-shade {
-    position: absolute; inset: 0;
-    background: linear-gradient(to top, rgba(8,8,10,.86) 0%, rgba(8,8,10,.55) 32%, rgba(8,8,10,.05) 62%, rgba(8,8,10,0) 100%);
+    position: absolute; inset-inline: 0; bottom: 0; height: 64%;
+    background: #0a0a0c; opacity: .58;
   }
-  .cover--brand {
-    background:
-      radial-gradient(120% 140% at 88% 8%, rgba(224,15,25,.55) 0%, rgba(224,15,25,0) 55%),
-      linear-gradient(135deg, #1c1c1f 0%, var(--ink) 60%, #050506 100%);
-  }
+  .cover--brand { background: var(--ink); }
   .cover--brand::after {
     content: ""; position: absolute; inset-inline-start: 0; bottom: 0;
     width: 100%; height: 5px; background: var(--brand);
@@ -448,7 +446,7 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
   }
   .cover-logo {
     height: 40px; width: auto; object-fit: contain; border-radius: 8px;
-    background: #fff; padding: 4px; box-shadow: 0 2px 10px rgba(0,0,0,.25);
+    background: #fff; padding: 4px;
   }
   .cover-word { font-size: 19px; font-weight: 800; color: #fff; letter-spacing: .01em; text-shadow: 0 1px 6px rgba(0,0,0,.4); }
   .cover-text { position: absolute; inset-inline: 28px; bottom: 24px; z-index: 2; }
@@ -500,7 +498,7 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
   .dot {
     position: absolute; inset-inline-start: -1px; top: 5px;
     width: 10px; height: 10px; border-radius: 50%;
-    background: var(--brand); box-shadow: 0 0 0 3px #fff, 0 0 0 4px rgba(224,15,25,.22);
+    background: var(--brand); border: 2px solid #fff;
   }
   .item-row { display: flex; gap: 18px; align-items: flex-start; }
   .item-time { min-width: 70px; padding-top: 1px; }
@@ -508,7 +506,7 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
   .time-dur { font-size: 11px; color: var(--ink-4); margin-top: 2px; }
   .item-photo {
     height: 104px; width: 156px; border-radius: 12px; object-fit: cover; flex-shrink: 0;
-    box-shadow: 0 2px 10px rgba(0,0,0,.10), inset 0 0 0 1px rgba(0,0,0,.05);
+    border: 1px solid var(--line);
     break-inside: avoid; page-break-inside: avoid;
   }
   /* No image should ever split across a page break. */
@@ -528,7 +526,7 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
   /* --- Options / choice block --- */
   .options {
     margin-top: 16px; padding: 14px 16px; padding-inline-start: 88px;
-    background: linear-gradient(180deg, #fff 0%, var(--panel) 100%);
+    background: var(--panel);
     border: 1px solid var(--line); border-radius: 14px;
     break-inside: avoid; page-break-inside: avoid;
   }
@@ -540,12 +538,11 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
   .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .opt {
     border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; gap: 12px; background: #fff;
-    box-shadow: 0 1px 4px rgba(0,0,0,.04);
     break-inside: avoid; page-break-inside: avoid;
   }
   .opt-photo {
     height: 64px; width: 64px; border-radius: 10px; object-fit: cover; flex-shrink: 0;
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
+    border: 1px solid var(--line);
     break-inside: avoid; page-break-inside: avoid;
   }
   .opt-body { flex: 1; min-width: 0; }
@@ -586,11 +583,10 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
   .closing {
     margin-top: 40px; break-inside: avoid; page-break-inside: avoid;
   }
+  /* Flat dark fill (no gradient) + a solid red top edge — prints clean. */
   .invest {
     padding: 24px 26px; border-radius: 16px; color: #fff;
-    background:
-      radial-gradient(120% 160% at 92% 0%, rgba(224,15,25,.6) 0%, rgba(224,15,25,0) 58%),
-      linear-gradient(135deg, #1f1f22 0%, var(--ink) 62%, #050506 100%);
+    background: var(--ink); border-top: 5px solid var(--brand);
     break-inside: avoid; page-break-inside: avoid;
   }
   .invest-cap {
