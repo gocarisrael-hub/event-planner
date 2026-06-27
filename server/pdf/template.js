@@ -286,15 +286,14 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
   // photo at all → a tasteful branded ink/red band (never a broken hero).
   const coverHtml = heroUri
     ? `
-      <div class="cover cover--photo">
-        <img class="cover-img" src="${heroUri}" alt="" />
-        <div class="cover-shade"></div>
-        ${wordmarkLockup('photo')}
-        <div class="cover-text">
-          <h1 class="cover-title">${esc(event.title || '')}</h1>
-          ${coverMetaHtml}
-        </div>
-      </div>`
+      <div class="topbar">
+        ${logoUri ? `<img class="topbar-logo" src="${logoUri}" alt="" />` : ''}
+        <span class="topbar-word">${esc(BRAND.name)}</span>
+      </div>
+      <div class="hero"><img class="hero-img" src="${heroUri}" alt="" /></div>
+      <h1 class="hero-title">${esc(event.title || '')}</h1>
+      ${coverMetaHtml}
+      <div class="hero-rule"></div>`
     : `
       <div class="cover cover--brand">
         ${wordmarkLockup('brand')}
@@ -423,17 +422,28 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
      top-corner (white) and the day title + meta bottom-aligned (white). When
      no photo exists at all, a branded ink/red band stands in. The cover is a
      self-contained block so it leads page 1 cleanly. */
+  /* PHOTO COVER: a clean photo banner with the title + meta BELOW it on white
+     (a magazine-feature opener). No text-over-photo overlay → no shaded box and
+     nothing to band in print, and the title is always legible. */
+  .topbar { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
+  .topbar-logo { height: 34px; width: auto; object-fit: contain; }
+  .topbar-word { font-size: 18px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
+  .hero {
+    height: 188px; border-radius: 14px; overflow: hidden;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .hero-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .hero-title {
+    font-family: 'Frank Ruhl Libre', 'Heebo', serif;
+    font-size: 32px; font-weight: 700; line-height: 1.12; color: var(--ink);
+    margin: 16px 0 0; break-after: avoid; page-break-after: avoid;
+  }
+  .hero-rule { width: 60px; height: 3px; background: var(--brand); margin: 12px 0 20px; }
+
+  /* BRANDED COVER (no photo): a tasteful dark band with white title. */
   .cover {
     position: relative; height: 210px; border-radius: 14px; overflow: hidden;
     margin: 0 0 24px; break-inside: avoid; page-break-inside: avoid;
-  }
-  .cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  /* Solid dark scrim on the bottom half for white-text legibility. A flat
-     layer (not a multi-stop gradient) prints clean in Chromium — gradients band
-     into gray smears in print. */
-  .cover-shade {
-    position: absolute; inset-inline: 0; bottom: 0; height: 64%;
-    background: #0a0a0c; opacity: .58;
   }
   .cover--brand { background: var(--ink); }
   .cover--brand::after {
@@ -456,12 +466,14 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
     text-shadow: 0 2px 14px rgba(0,0,0,.45);
   }
   .cover-tag { color: rgba(255,255,255,.86); font-size: 14px; margin-top: 8px; letter-spacing: .02em; }
+  /* Meta defaults to ink (photo cover, below the banner); white inside the
+     branded dark band. */
   .cover-meta {
-    margin-top: 11px; font-size: 13.5px; font-weight: 500;
-    color: rgba(255,255,255,.92); text-shadow: 0 1px 8px rgba(0,0,0,.5);
+    margin-top: 10px; font-size: 13.5px; font-weight: 500; color: var(--ink-3);
   }
-  .cover-meta .meta-dot { color: rgba(255,255,255,.55); }
+  .cover--brand .cover-meta { color: rgba(255,255,255,.92); }
   .meta-dot { color: var(--ink-4); margin: 0 8px; }
+  .cover--brand .cover-meta .meta-dot { color: rgba(255,255,255,.5); }
 
   .sched {
     font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
@@ -479,11 +491,14 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
      activity carries its own segment + dot, which survives page breaks cleanly
      while keeping the same hairline-spine + red-dot look on a single page. */
   .items { position: relative; }
+  /* No break-inside:avoid on the whole .item — a tall activity (photo + long
+     description) may flow across a page so pages fill naturally instead of
+     jumping the whole block and leaving big gaps / extra pages. The photo and
+     option cards keep their own avoid so they never split mid-image. */
   .item {
     position: relative; padding-inline-start: 26px;
-    padding-bottom: 14px; margin-bottom: 14px;
+    padding-bottom: 13px; margin-bottom: 13px;
     border-bottom: 1px solid var(--line-2);
-    break-inside: avoid; page-break-inside: avoid;
   }
   /* Per-item spine segment: a vertical hairline on the start edge spanning the
      full height of this item, so the spine reconstructs continuously down the
@@ -505,15 +520,15 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
   .time-label { font-size: 16px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
   .time-dur { font-size: 11px; color: var(--ink-4); margin-top: 2px; }
   .item-photo {
-    height: 104px; width: 156px; border-radius: 12px; object-fit: cover; flex-shrink: 0;
+    height: 96px; width: 142px; border-radius: 11px; object-fit: cover; flex-shrink: 0;
     border: 1px solid var(--line);
     break-inside: avoid; page-break-inside: avoid;
   }
   /* No image should ever split across a page break. */
   img { break-inside: avoid; page-break-inside: avoid; }
   .item-main { flex: 1; min-width: 0; padding-top: 1px; }
-  .item-title { font-size: 18px; font-weight: 700; color: var(--ink); line-height: 1.25; }
-  .item-desc { font-size: 13px; line-height: 1.62; color: var(--ink-2); word-break: break-word; margin-top: 4px; }
+  .item-title { font-size: 17px; font-weight: 700; color: var(--ink); line-height: 1.25; }
+  .item-desc { font-size: 12.5px; line-height: 1.55; color: var(--ink-2); word-break: break-word; margin-top: 4px; }
   .item-contact { font-size: 12px; color: var(--ink-3); margin-top: 7px; }
   .contact-label { font-size: 10.5px; letter-spacing: .04em; color: var(--ink-4); }
   .item-price {
