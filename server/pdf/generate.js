@@ -204,7 +204,7 @@ async function getBrowser() {
   return browserPromise;
 }
 
-export async function generateProposalPdf(event, { prices } = { prices: false }) {
+export async function generateProposalPdf(event, { prices, budget = true } = { prices: false, budget: true }) {
   // Pre-resize/encode all photos before rendering so the PDF embeds small
   // JPEGs instead of full-size originals.
   const photos = await buildPhotoMap(event);
@@ -225,7 +225,7 @@ export async function generateProposalPdf(event, { prices } = { prices: false })
   try {
     // 'load' (not 'networkidle0') with a bounded timeout so a slow/unreachable
     // font or image URL can't hang draft-reply indefinitely.
-    await page.setContent(proposalHtml(event, { prices, photos, logo, cover }), { waitUntil: 'load', timeout: 15000 });
+    await page.setContent(proposalHtml(event, { prices, budget, photos, logo, cover }), { waitUntil: 'load', timeout: 15000 });
     // A slim header/footer carries the wordmark + page numbers. The page `margin`
     // here reserves vertical space for them; the body CSS uses `@page{margin:0}`
     // and its own .page padding, so content never overlaps the footer band.

@@ -96,10 +96,12 @@ router.get('/:id/proposal.pdf', async (req, res) => {
   if (!event) return res.status(404).json({ error: 'not found' });
 
   const prices = req.query.prices === 'true';
+  // In no-prices mode the per-person budget band shows unless budget=false.
+  const budget = req.query.budget !== 'false';
 
   let pdfBuffer;
   try {
-    pdfBuffer = await generateProposalPdf(withItems(event), { prices });
+    pdfBuffer = await generateProposalPdf(withItems(event), { prices, budget });
   } catch (err) {
     return res
       .status(503)
@@ -115,9 +117,9 @@ router.get('/:id/proposal.pdf', async (req, res) => {
     .replace(/[/\\:*?"<>|\x00-\x1f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  let name;
-  if (!base) name = prices ? 'הצעה (עם מחירים).pdf' : 'הצעה.pdf';
-  else name = prices ? `הצעה – ${base} (עם מחירים).pdf` : `הצעה – ${base}.pdf`;
+  // Three variants: with prices / no prices (with budget) / no prices, no budget.
+  const suffix = prices ? ' (עם מחירים)' : budget ? '' : ' (ללא תקציב)';
+  const name = base ? `הצעה – ${base}${suffix}.pdf` : `הצעה${suffix}.pdf`;
   const utf8Name = encodeURIComponent(name);
   res.set('Content-Type', 'application/pdf');
   res.set(

@@ -251,10 +251,12 @@ function pickHero(event, photoMap) {
   return null;
 }
 
-export function proposalHtml(event, { prices, photos, logo, cover } = { prices: false, photos: {}, logo: null, cover: null }) {
+export function proposalHtml(event, { prices, budget, photos, logo, cover } = { prices: false, budget: true, photos: {}, logo: null, cover: null }) {
   const photoMap = photos || {};
   const logoUri = logo || null;
   const showPrices = Boolean(prices);
+  // In no-prices mode, the per-person budget band shows unless explicitly off.
+  const showBudget = budget !== false;
   const allItems = event.items || [];
   const optionsMode = event.options_mode === true;
   const groupSize = event.group_size > 0 ? event.group_size : 0;
@@ -360,7 +362,7 @@ export function proposalHtml(event, { prices, photos, logo, cover } = { prices: 
     }
   } else {
     const budgetNum = Number(event.budget);
-    if (Number.isFinite(budgetNum) && budgetNum > 0) {
+    if (showBudget && Number.isFinite(budgetNum) && budgetNum > 0) {
       closingBandHtml = `
         <div class="invest budget">
           <div class="invest-cap">ההשקעה ליום</div>
