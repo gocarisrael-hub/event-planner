@@ -16,29 +16,31 @@ export default function ProposalPreview() {
   // Build a filesystem-safe PDF filename from the event title, distinguishing
   // the with/without-prices variants. The a.download attribute below is what
   // actually names the saved blob.
-  const pdfFilename = (withPrices) => {
+  const pdfFilename = (withPrices, withBudget) => {
     const base = String(event?.title ?? '')
       .replace(/[/\\:*?"<>|\x00-\x1f]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    if (!base) return withPrices ? 'הצעה (עם מחירים).pdf' : 'הצעה.pdf';
-    return withPrices ? `הצעה – ${base} (עם מחירים).pdf` : `הצעה – ${base}.pdf`;
+    const suffix = withPrices ? ' (עם מחירים)' : withBudget ? '' : ' (ללא תקציב)';
+    return base ? `הצעה – ${base}${suffix}.pdf` : `הצעה${suffix}.pdf`;
   };
 
   // Download the server-rendered PDF (clean A4 Hebrew) instead of printing.
-  const downloadPdf = async (withPrices) => {
+  // Three variants: with prices / no prices (with budget) / no prices, no budget.
+  const downloadPdf = async (withPrices, withBudget = true) => {
     setError('');
     setPending(true);
     try {
-      const res = await fetch(`/api/events/${id}/proposal.pdf?prices=${withPrices}`, {
-        headers: authHeaders(),
-      });
+      const res = await fetch(
+        `/api/events/${id}/proposal.pdf?prices=${withPrices}&budget=${withBudget}`,
+        { headers: authHeaders() },
+      );
       if (!res.ok) throw new Error(`status ${res.status}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = pdfFilename(withPrices);
+      a.download = pdfFilename(withPrices, withBudget);
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -79,11 +81,14 @@ export default function ProposalPreview() {
         <div className="flex items-center gap-2 mr-auto">
           {error && <span className="text-sm text-red-500">{error}</span>}
           {pending && <span className="text-sm text-slate-400">יוצר PDF…</span>}
-          <button onClick={() => downloadPdf(false)} disabled={pending} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
-            הורד PDF בלי מחירים
+          <button onClick={() => downloadPdf(false, true)} disabled={pending} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
+            בלי מחירים
           </button>
-          <button onClick={() => downloadPdf(true)} disabled={pending} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
-            הורד PDF עם מחירים
+          <button onClick={() => downloadPdf(false, false)} disabled={pending} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
+            בלי מחירים ובלי תקציב
+          </button>
+          <button onClick={() => downloadPdf(true, true)} disabled={pending} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
+            עם מחירים
           </button>
         </div>
       </div>
@@ -231,7 +236,7 @@ export default function ProposalPreview() {
               </>
             ) : (
               <div className="flex items-center justify-between">
-                <span className="font-bold text-lg" style={{ color: brand.colors.dark }}>תקציב משוער לאדם</span>
+                <span className="font-bold text-lg" style={{ color: brand.colors.dark }}>תקציב לאדם</span>
                 {formatPrice(event.budget) && (
                   <span className="font-extrabold text-xl" style={{ color: brand.colors.primary }}>
                     {formatPrice(event.budget)}
