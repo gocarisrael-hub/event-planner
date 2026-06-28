@@ -213,8 +213,7 @@ function DayDetailsEditor({ event, onSave, onClose }) {
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const save = async (e) => {
-    e.preventDefault();
+  const persist = async () => {
     setSaving(true);
     try {
       await onSave({
@@ -228,10 +227,19 @@ function DayDetailsEditor({ event, onSave, onClose }) {
         target_month: whenMode === 'month' ? form.target_month || null : null,
         target_season: whenMode === 'season' ? form.target_season || null : null,
       });
-      onClose();
     } finally {
       setSaving(false);
     }
+  };
+
+  const save = async (e) => {
+    e.preventDefault();
+    await persist();
+  };
+
+  const saveAndClose = async () => {
+    await persist();
+    onClose();
   };
 
   return (
@@ -299,12 +307,13 @@ function DayDetailsEditor({ event, onSave, onClose }) {
       </div>
 
       <div className="flex gap-2 pt-1">
-        <button type="submit" disabled={saving}
+        <button type="button" onClick={saveAndClose} disabled={saving}
           className="bg-ocar text-white px-5 py-2 rounded-lg font-medium hover:opacity-90 disabled:opacity-60">
-          {saving ? 'שומר…' : 'שמור שינויים'}
+          {saving ? 'שומר…' : 'סגור ושמור'}
         </button>
-        <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg text-slate-500">
-          ביטול
+        <button type="submit" disabled={saving}
+          className="px-5 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60">
+          {saving ? 'שומר…' : 'שמור שינויים'}
         </button>
       </div>
     </form>
