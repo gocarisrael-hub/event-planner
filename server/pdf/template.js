@@ -1,7 +1,17 @@
 // Server-side proposal HTML, mirroring client/src/pages/ProposalPreview.jsx.
-// Self-contained: RTL, lang=he, embedded CSS, Heebo via Google Fonts.
-// When { prices:false } no prices/totals are rendered (reply PDF is always
-// prices=false).
+// Self-contained: RTL, lang=he, embedded CSS, Heebo + Frank Ruhl Libre via
+// Google Fonts. When { prices:false } no prices/totals are rendered (reply PDF
+// is always prices=false).
+//
+// DESIGN SYSTEM: premium, minimal, editorial, spacious. Each activity is a
+// self-contained card with one CONSISTENT vertical order everywhere —
+//   1) title  2) image  3) time & duration  4) description  5) contact
+// — separated by generous whitespace, never split across a page. Restrained
+// palette (white / light neutrals) with the brand red used sparingly to flag
+// the most important info (times, prices, totals). PRINT-SAFE: no CSS
+// gradients and no blurred/banding box-shadows anywhere (they render as ugly
+// gray bands in a printed PDF); separation comes from flat fills + 1px
+// hairline borders only.
 const BRAND = {
   name: 'star הפקות',
   tagline: 'בונים ימי כיף וימי גיבוש',
@@ -128,15 +138,18 @@ function img(src, cls, photos) {
   return `<img class="${cls}" src="${uri}" alt="" />`;
 }
 
-// Render one schedule item's HTML block. Shared by single- and two-option
-// modes so the activity-block markup stays identical everywhere.
+// Render one schedule item as a self-contained activity card. The vertical
+// order is IDENTICAL for every activity regardless of length:
+//   1) title (+ price chip, prices mode)  2) image  3) time & duration
+//   4) description  5) contact            then any choice/option block.
+// Shared by single- and two-option modes so the markup stays identical.
 function itemHtml(it, { showPrices, photoMap }) {
     const tl = timingLabel(it) || '—';
     const dur = formatDuration(it.approx_duration_hours);
     const hasOptions = it.options?.length > 0;
 
     const mainPhoto = !hasOptions && it.photos?.[0]
-      ? img(it.photos[0], 'item-photo', photoMap)
+      ? img(it.photos[0], 'act-photo', photoMap)
       : '';
 
     // Choice-block items have a price RANGE spanning item.price + option prices
@@ -146,9 +159,9 @@ function itemHtml(it, { showPrices, photoMap }) {
     if (showPrices) {
       if (hasOptions) {
         const { low: lo, high: hi } = priceRange(it);
-        slotPrice = `<div class="item-price"><bdi>${esc(formatRange(lo, hi))}</bdi></div>`;
+        slotPrice = `<div class="act-price"><bdi>${esc(formatRange(lo, hi))}</bdi></div>`;
       } else if (formatPrice(it.price)) {
-        slotPrice = `<div class="item-price"><bdi>${esc(formatPrice(it.price))}</bdi></div>`;
+        slotPrice = `<div class="act-price"><bdi>${esc(formatPrice(it.price))}</bdi></div>`;
       }
     }
 
@@ -182,24 +195,24 @@ function itemHtml(it, { showPrices, photoMap }) {
         </div>`;
     }
 
+    const durHtml = dur ? `<span class="act-dur">${esc(dur)}</span>` : '';
+
     return `
-      <div class="item">
-        <span class="dot" aria-hidden="true"></span>
-        <div class="item-row">
-          <div class="item-time">
-            <div class="time-label"><bdi>${esc(tl)}</bdi></div>
-            ${dur ? `<div class="time-dur">${esc(dur)}</div>` : ''}
-          </div>
-          ${mainPhoto}
-          <div class="item-main">
-            <div class="item-title">${esc(it.title)}</div>
-            ${it.description ? `<div class="item-desc">${esc(it.description)}</div>` : ''}
-            ${itemContact ? `<div class="item-contact">איש קשר: ${esc(itemContact)}</div>` : ''}
-          </div>
+      <article class="act">
+        <header class="act-head">
+          <h3 class="act-title">${esc(it.title)}</h3>
           ${slotPrice}
+        </header>
+        ${mainPhoto ? `<div class="act-media">${mainPhoto}</div>` : ''}
+        <div class="act-time">
+          <span class="act-time-dot" aria-hidden="true"></span>
+          <span class="act-time-val"><bdi>${esc(tl)}</bdi></span>
+          ${durHtml}
         </div>
+        ${it.description ? `<p class="act-desc">${esc(it.description)}</p>` : ''}
+        ${itemContact ? `<div class="act-contact">איש קשר: ${esc(itemContact)}</div>` : ''}
         ${optionsHtml}
-      </div>`;
+      </article>`;
 }
 
 // The totals band (per-person + group) for a given price range. Only rendered
@@ -265,27 +278,33 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
   // one from the photo map (cover_photo → first activity photo).
   const heroUri = cover || pickHero(event, photoMap);
 
-  // Cover meta line: client · {N} משתתפים · month/date · location
-  const coverMetaParts = [
-    event.client_name ? esc(event.client_name) : '',
-    event.group_size ? `<bdi>${esc(event.group_size)}</bdi> משתתפים` : '',
-    whenLabel(event) ? `<bdi>${esc(whenLabel(event))}</bdi>` : '',
-    event.location ? esc(event.location) : '',
-  ].filter(Boolean);
-  const coverMetaHtml = coverMetaParts.length
-    ? `<div class="cover-meta">${coverMetaParts.join('<span class="meta-dot">·</span>')}</div>`
+  // Cover metadata: client / participants / when / location rendered as an
+  // elegant labeled strip, each cell separated by a SUBTLE hairline divider.
+  // Only cells with a value render.
+  const metaCells = [
+    ['לקוח', event.client_name ? esc(event.client_name) : ''],
+    ['משתתפים', event.group_size ? `<bdi>${esc(event.group_size)}</bdi>` : ''],
+    ['מועד', whenLabel(event) ? `<bdi>${esc(whenLabel(event))}</bdi>` : ''],
+    ['מיקום', event.location ? esc(event.location) : ''],
+  ].filter(([, v]) => v);
+  const coverMetaHtml = metaCells.length
+    ? `<div class="cover-meta">${metaCells
+        .map(([l, v]) => `<div class="meta-cell"><div class="meta-label">${l}</div><div class="meta-value">${v}</div></div>`)
+        .join('')}</div>`
     : '';
 
-  // The wordmark lockup, reused on the photo hero (white) and branded cover.
+  // The wordmark lockup, reused on the branded (no-photo) cover.
   const wordmarkLockup = (variant) => `
     <div class="cover-brand cover-brand--${variant}">
       ${logoUri ? `<img class="cover-logo" src="${logoUri}" alt="" />` : ''}
       <span class="cover-word">${esc(BRAND.name)}</span>
     </div>`;
 
-  // COVER / HERO. With a photo → full-width band, dark bottom gradient, the
-  // wordmark top corner and the title + meta bottom-aligned in white. With NO
-  // photo at all → a tasteful branded ink/red band (never a broken hero).
+  // COVER / HERO. With a photo → a quiet top wordmark, a prominent hero photo,
+  // then the title + metadata below it on white (a magazine-feature opener). No
+  // text-over-photo overlay → no shaded box and nothing to band in print, and
+  // the title is always legible. With NO photo at all → a tasteful branded ink
+  // band with a white title (still flat fills only, never a broken hero).
   const coverHtml = heroUri
     ? `
       <div class="topbar">
@@ -293,36 +312,37 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
         <span class="topbar-word">${esc(BRAND.name)}</span>
       </div>
       <div class="hero"><img class="hero-img" src="${heroUri}" alt="" /></div>
+      <div class="cover-eyebrow">${esc(BRAND.tagline)}</div>
       <h1 class="hero-title">${esc(event.title || '')}</h1>
-      ${coverMetaHtml}
-      <div class="hero-rule"></div>`
+      <div class="hero-rule"></div>
+      ${coverMetaHtml}`
     : `
       <div class="cover cover--brand">
         ${wordmarkLockup('brand')}
         <div class="cover-text">
+          <div class="cover-eyebrow cover-eyebrow--on-dark">${esc(BRAND.tagline)}</div>
           <h1 class="cover-title">${esc(event.title || '')}</h1>
-          <div class="cover-tag">${esc(BRAND.tagline)}</div>
-          ${coverMetaHtml}
         </div>
-      </div>`;
+      </div>
+      ${coverMetaHtml}`;
 
-  // Body: single schedule (unchanged) OR two stacked, labeled option sections.
-  // In prices mode the per-section totals stay inline; in no-prices mode totals
-  // are suppressed and replaced by the single closing investment band below.
+  // Body: single schedule OR two stacked, labeled option sections. In prices
+  // mode the per-section totals stay inline; in no-prices mode totals are
+  // suppressed and replaced by the single closing investment band below.
   let bodyHtml;
   if (optionsMode) {
     const aItems = allItems.filter((it) => it.option !== 'B');
     const bItems = allItems.filter((it) => it.option === 'B');
     bodyHtml = `
       <div class="sched">הלו״ז ליום</div>
-      <div class="option-section">
+      <section class="option-section">
         <div class="option-head">אופציה א</div>
         ${scheduleSection(aItems, { showPrices, photoMap, groupSize, totalsLabel: 'מחיר לאדם · אופציה א' })}
-      </div>
-      <div class="option-section">
+      </section>
+      <section class="option-section">
         <div class="option-head">אופציה ב</div>
         ${scheduleSection(bItems, { showPrices, photoMap, groupSize, totalsLabel: 'מחיר לאדם · אופציה ב' })}
-      </div>`;
+      </section>`;
   } else {
     bodyHtml = `
       <div class="sched">הלו״ז ליום</div>
@@ -330,18 +350,13 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
   }
 
   // --- Closing: investment band + CTA, kept tidy and paired ---------------
-  // The closing band is the confident "investment per person" moment near the
-  // end. With prices on, it summarises the overall per-person + group total.
+  // With prices on, the closing band summarises the overall per-person + group
+  // total (single mode only — options mode already shows a per-section total).
   // Without prices, it surfaces the planned per-person goal budget instead
-  // (event.budget is already a per-person "לראש" figure). The band and the warm
-  // CTA are wrapped TOGETHER in one .closing block with break-inside:avoid, so
-  // the budget band can never orphan onto a page by itself or sit half-cut — if
-  // it must move to a new page it carries the CTA with it.
+  // (event.budget is a per-person "לראש" figure). The band + warm CTA are
+  // wrapped TOGETHER in one .closing block so the band can never orphan.
   let closingBandHtml = '';
   if (showPrices) {
-    // Overall per-person investment across the whole day (single mode) — in
-    // options mode each section already shows its own total, so the closing
-    // band leads with a headline rather than a duplicate number.
     if (!optionsMode) {
       const { low, high } = total(allItems);
       if (high > 0) {
@@ -403,8 +418,8 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
 <style>
   :root {
     --brand:#e00f19; --brand-deep:#b30c14; --brand-wash:#fdecec;
-    --ink:#141414; --ink-2:#3f3f43; --ink-3:#6b6b70; --ink-4:#9a9aa0;
-    --line:#e9e9ec; --line-2:#f3f3f5; --panel:#faf8f6; --paper:#fdfcfb;
+    --ink:#141414; --ink-2:#3d3d42; --ink-3:#6b6b72; --ink-4:#9a9aa2;
+    --line:#e9e9ec; --line-2:#f1f1f3; --card:#ffffff; --paper:#fbfbfa;
   }
   @page { margin: 0; }
   * { box-sizing: border-box; }
@@ -417,216 +432,238 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
     print-color-adjust: exact;
   }
   bdi { font-variant-numeric: tabular-nums; }
-  .page { background: var(--paper); padding: 32px 40px 36px; }
+  /* Generous page margins; the puppeteer footer band lives below the bottom
+     padding so nothing clips. */
+  .page { background: var(--paper); padding: 36px 50px 40px; }
 
-  /* --- COVER / HERO -------------------------------------------------------
-     A full-width hero band with a photo + dark bottom gradient, the wordmark
-     top-corner (white) and the day title + meta bottom-aligned (white). When
-     no photo exists at all, a branded ink/red band stands in. The cover is a
-     self-contained block so it leads page 1 cleanly. */
-  /* PHOTO COVER: a clean photo banner with the title + meta BELOW it on white
-     (a magazine-feature opener). No text-over-photo overlay → no shaded box and
-     nothing to band in print, and the title is always legible. */
-  .topbar { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
-  .topbar-logo { height: 34px; width: auto; object-fit: contain; }
-  .topbar-word { font-size: 18px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
+  /* ====================================================================
+     COVER  — quiet wordmark, prominent hero photo, then the title + an
+     elegant labeled metadata strip below it on white. No overlay text on
+     the photo → always legible, nothing to band in print. */
+  .topbar { display: flex; align-items: center; gap: 11px; margin: 0 0 18px; }
+  .topbar-logo { height: 34px; width: auto; object-fit: contain; border-radius: 6px; }
+  .topbar-word { font-size: 17px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
   .hero {
-    height: 188px; border-radius: 14px; overflow: hidden;
+    height: 320px; border-radius: 18px; overflow: hidden; background: var(--line-2);
     break-inside: avoid; page-break-inside: avoid;
   }
   .hero-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cover-eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--brand); margin: 26px 0 0;
+  }
   .hero-title {
     font-family: 'Frank Ruhl Libre', 'Heebo', serif;
-    font-size: 32px; font-weight: 700; line-height: 1.12; color: var(--ink);
-    margin: 16px 0 0; break-after: avoid; page-break-after: avoid;
+    font-size: 40px; font-weight: 700; line-height: 1.1; color: var(--ink);
+    margin: 10px 0 0; break-after: avoid; page-break-after: avoid;
   }
-  .hero-rule { width: 60px; height: 3px; background: var(--brand); margin: 12px 0 20px; }
+  .hero-rule { width: 56px; height: 3px; background: var(--brand); border-radius: 2px; margin: 18px 0 22px; }
 
-  /* BRANDED COVER (no photo): a tasteful dark band with white title. */
+  /* BRANDED COVER (no photo at all): a tasteful flat ink band, white title. */
   .cover {
-    position: relative; height: 210px; border-radius: 14px; overflow: hidden;
-    margin: 0 0 24px; break-inside: avoid; page-break-inside: avoid;
+    position: relative; min-height: 300px; border-radius: 18px; overflow: hidden;
+    margin: 0 0 26px; padding: 30px 34px; display: flex; flex-direction: column;
+    justify-content: flex-end;
+    break-inside: avoid; page-break-inside: avoid;
   }
   .cover--brand { background: var(--ink); }
   .cover--brand::after {
     content: ""; position: absolute; inset-inline-start: 0; bottom: 0;
-    width: 100%; height: 5px; background: var(--brand);
+    width: 100%; height: 6px; background: var(--brand);
   }
   .cover-brand {
-    position: absolute; top: 22px; inset-inline-start: 26px;
+    position: absolute; top: 28px; inset-inline-start: 34px;
     display: flex; align-items: center; gap: 11px; z-index: 2;
   }
   .cover-logo {
-    height: 40px; width: auto; object-fit: contain; border-radius: 8px;
+    height: 38px; width: auto; object-fit: contain; border-radius: 8px;
     background: #fff; padding: 4px;
   }
-  .cover-word { font-size: 19px; font-weight: 800; color: #fff; letter-spacing: .01em; text-shadow: 0 1px 6px rgba(0,0,0,.4); }
-  .cover-text { position: absolute; inset-inline: 28px; bottom: 24px; z-index: 2; }
+  .cover-word { font-size: 18px; font-weight: 800; color: #fff; letter-spacing: .01em; }
+  .cover-text { position: relative; z-index: 2; }
+  .cover-eyebrow--on-dark { color: #ff6068; margin: 0 0 8px; }
   .cover-title {
     font-family: 'Frank Ruhl Libre', 'Heebo', serif;
-    font-size: 40px; font-weight: 700; line-height: 1.08; color: #fff; margin: 0;
-    text-shadow: 0 2px 14px rgba(0,0,0,.45);
+    font-size: 42px; font-weight: 700; line-height: 1.08; color: #fff; margin: 0;
   }
-  .cover-tag { color: rgba(255,255,255,.86); font-size: 14px; margin-top: 8px; letter-spacing: .02em; }
-  /* Meta defaults to ink (photo cover, below the banner); white inside the
-     branded dark band. */
-  .cover-meta {
-    margin-top: 10px; font-size: 13.5px; font-weight: 500; color: var(--ink-3);
-  }
-  .cover--brand .cover-meta { color: rgba(255,255,255,.92); }
-  .meta-dot { color: var(--ink-4); margin: 0 8px; }
-  .cover--brand .cover-meta .meta-dot { color: rgba(255,255,255,.5); }
 
+  /* Metadata strip: labeled cells separated by SUBTLE hairline dividers. */
+  .cover-meta {
+    display: flex; flex-wrap: wrap; gap: 0 30px;
+    padding: 4px 0 4px; margin-bottom: 30px;
+  }
+  .meta-cell {
+    padding-inline-end: 30px; border-inline-end: 1px solid var(--line);
+  }
+  .meta-cell:last-child { border-inline-end: 0; padding-inline-end: 0; }
+  .meta-label {
+    font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-4); margin-bottom: 3px;
+  }
+  .meta-value { font-size: 15px; font-weight: 600; color: var(--ink); }
+  .cover--brand + .cover-meta .meta-cell { border-color: var(--line); }
+  .meta-dot { color: var(--ink-4); margin: 0 7px; }
+
+  /* ====================================================================
+     SCHEDULE — section label */
   .sched {
-    font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
-    color: var(--brand); margin: 4px 0 20px;
+    font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--brand); margin: 4px 0 22px;
     break-after: avoid; page-break-after: avoid;
-    display: flex; align-items: center; gap: 12px;
+    display: flex; align-items: center; gap: 14px;
   }
   .sched::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 
-  /* --- Timeline: hairline spine on the start (RTL-right) edge + red dots ---
-     The spine is drawn PER ITEM (each .item paints its own segment via
-     ::before) instead of one continuous absolutely-positioned line over the
-     whole .items container. A single container-spanning line would not
-     paginate — it would get clipped/misaligned across A4 page breaks — so each
-     activity carries its own segment + dot, which survives page breaks cleanly
-     while keeping the same hairline-spine + red-dot look on a single page. */
-  .items { position: relative; }
-  /* No break-inside:avoid on the whole .item — a tall activity (photo + long
-     description) may flow across a page so pages fill naturally instead of
-     jumping the whole block and leaving big gaps / extra pages. The photo and
-     option cards keep their own avoid so they never split mid-image. */
-  .item {
-    position: relative; padding-inline-start: 26px;
-    padding-bottom: 13px; margin-bottom: 13px;
-    border-bottom: 1px solid var(--line-2);
-  }
-  /* Per-item spine segment: a vertical hairline on the start edge spanning the
-     full height of this item, so the spine reconstructs continuously down the
-     page yet never spans (and thus never gets cut at) a page boundary. */
-  .item::before {
-    content: ""; position: absolute; inset-inline-start: 5px;
-    top: 0; bottom: 0; width: 2px; background: var(--line);
-  }
-  .item:first-child::before { top: 6px; }
-  .item:last-child::before { bottom: auto; height: 6px; }
-  .item:last-child { border-bottom: 0; margin-bottom: 0; }
-  .dot {
-    position: absolute; inset-inline-start: -1px; top: 5px;
-    width: 10px; height: 10px; border-radius: 50%;
-    background: var(--brand); border: 2px solid #fff;
-  }
-  .item-row { display: flex; gap: 18px; align-items: flex-start; }
-  .item-time { min-width: 70px; padding-top: 1px; }
-  .time-label { font-size: 16px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-  .time-dur { font-size: 11px; color: var(--ink-4); margin-top: 2px; }
-  .item-photo {
-    height: 96px; width: 142px; border-radius: 11px; object-fit: cover; flex-shrink: 0;
+  .items { display: block; }
+
+  /* ====================================================================
+     ACTIVITY CARD — one self-contained block, identical vertical order
+     everywhere: title → image → time → description → contact. Separation
+     comes from generous spacing + a single hairline border (no shadow, no
+     heavy frame). The whole card never splits across a page. */
+  .act {
+    background: var(--card);
     border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 26px 28px 28px;
+    margin-bottom: 22px;
     break-inside: avoid; page-break-inside: avoid;
   }
-  /* No image should ever split across a page break. */
-  img { break-inside: avoid; page-break-inside: avoid; }
-  .item-main { flex: 1; min-width: 0; padding-top: 1px; }
-  .item-title { font-size: 17px; font-weight: 700; color: var(--ink); line-height: 1.25; }
-  .item-desc { font-size: 12.5px; line-height: 1.55; color: var(--ink-2); word-break: break-word; margin-top: 4px; }
-  .item-contact { font-size: 12px; color: var(--ink-3); margin-top: 7px; }
-  .contact-label { font-size: 10.5px; letter-spacing: .04em; color: var(--ink-4); }
-  .item-price {
-    font-size: 15px; font-weight: 800; white-space: nowrap;
+  .act:last-child { margin-bottom: 0; }
+  .act-head {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 18px;
+    break-after: avoid; page-break-after: avoid;
+  }
+  .act-title {
+    font-size: 21px; font-weight: 700; color: var(--ink); line-height: 1.25; margin: 0;
+    letter-spacing: -.01em;
+  }
+  .act-price {
+    font-size: 17px; font-weight: 800; white-space: nowrap; flex-shrink: 0;
     color: var(--brand-deep); font-variant-numeric: tabular-nums; align-self: flex-start;
   }
+  /* Consistent image banner (visual consistency > size): full width, fixed
+     height, rounded. object-fit:cover keeps aspect ratio and never stretches. */
+  .act-media {
+    margin-top: 16px; border-radius: 14px; overflow: hidden; background: var(--line-2);
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .act-photo {
+    width: 100%; height: 240px; object-fit: cover; display: block;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  img { break-inside: avoid; page-break-inside: avoid; }
 
-  /* --- Options / choice block --- */
+  /* TIME — the most scannable element: a distinct chip, visually separate from
+     the prose. Brand-red marker + bold tabular time + muted duration. */
+  .act-time {
+    display: inline-flex; align-items: center; gap: 9px;
+    margin-top: 16px; padding: 7px 14px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 999px;
+  }
+  .act-time-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--brand); flex-shrink: 0;
+  }
+  .act-time-val {
+    font-size: 15px; font-weight: 800; color: var(--ink);
+    font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+  }
+  .act-dur { font-size: 12px; font-weight: 600; color: var(--ink-3); }
+  .act-dur::before { content: "·"; margin-inline-end: 7px; color: var(--ink-4); }
+
+  .act-desc {
+    font-size: 13px; line-height: 1.75; color: var(--ink-2);
+    margin: 14px 0 0; word-break: break-word; max-width: 64ch;
+  }
+  .act-contact { font-size: 12px; color: var(--ink-3); margin-top: 12px; }
+
+  /* --- Choice / option block (inside an activity card) --- */
   .options {
-    margin-top: 16px; padding: 14px 16px; padding-inline-start: 88px;
-    background: var(--panel);
+    margin-top: 18px; padding: 16px 18px;
+    background: var(--paper);
     border: 1px solid var(--line); border-radius: 14px;
     break-inside: avoid; page-break-inside: avoid;
   }
   .options-label {
-    font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
-    color: var(--brand); margin-bottom: 10px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--brand); margin-bottom: 12px;
     break-after: avoid; page-break-after: avoid;
   }
   .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .opt {
-    border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; gap: 12px; background: #fff;
+    border: 1px solid var(--line); border-radius: 12px; padding: 13px; display: flex; gap: 12px;
+    background: var(--card);
     break-inside: avoid; page-break-inside: avoid;
   }
   .opt-photo {
-    height: 64px; width: 64px; border-radius: 10px; object-fit: cover; flex-shrink: 0;
+    height: 66px; width: 66px; border-radius: 10px; object-fit: cover; flex-shrink: 0;
     border: 1px solid var(--line);
     break-inside: avoid; page-break-inside: avoid;
   }
   .opt-body { flex: 1; min-width: 0; }
   .opt-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-  .opt-title { font-weight: 600; color: var(--ink); }
-  .opt-price { font-size: 13px; font-weight: 600; white-space: nowrap; color: var(--ink); font-variant-numeric: tabular-nums; }
-  .opt-desc { font-size: 13px; line-height: 1.6; color: var(--ink-2); word-break: break-word; margin-top: 2px; }
-  .opt-contact { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+  .opt-title { font-weight: 700; color: var(--ink); font-size: 14px; }
+  .opt-price { font-size: 13px; font-weight: 700; white-space: nowrap; color: var(--brand-deep); font-variant-numeric: tabular-nums; }
+  .opt-desc { font-size: 12.5px; line-height: 1.6; color: var(--ink-2); word-break: break-word; margin-top: 4px; }
+  .opt-contact { font-size: 11.5px; color: var(--ink-3); margin-top: 7px; }
+  .contact-label { font-size: 10px; letter-spacing: .04em; color: var(--ink-4); }
 
   /* --- Inline per-section totals (prices mode, inside the schedule) -------- */
   .totals {
-    margin-top: 20px; padding: 14px 0 0;
+    margin-top: 22px; padding: 16px 4px 0;
     border-top: 2px solid var(--brand);
     break-inside: avoid; page-break-inside: avoid;
   }
   .totals-row { display: flex; justify-content: space-between; align-items: baseline; }
   .totals-label { font-weight: 700; font-size: 14px; color: var(--ink); }
-  .totals-value { font-weight: 800; font-size: 19px; color: var(--brand-deep); font-variant-numeric: tabular-nums; }
-  .totals-group { display: flex; justify-content: space-between; align-items: baseline; color: var(--ink-3); font-size: 13px; margin-top: 8px; }
-  .totals-group-value { font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .totals-value { font-weight: 800; font-size: 20px; color: var(--brand-deep); font-variant-numeric: tabular-nums; }
+  .totals-group { display: flex; justify-content: space-between; align-items: baseline; color: var(--ink-3); font-size: 13px; margin-top: 9px; }
+  .totals-group-value { font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 
   /* --- A/B option sections: stacked, each with a labeled header band --- */
-  .option-section { margin-bottom: 36px; }
+  .option-section { margin-bottom: 40px; }
   .option-section:last-of-type { margin-bottom: 0; }
   .option-head {
     font-family: 'Frank Ruhl Libre', 'Heebo', serif;
-    font-size: 22px; font-weight: 700; color: var(--ink);
-    padding: 0 0 8px; margin: 0 0 18px;
+    font-size: 24px; font-weight: 700; color: var(--ink);
+    padding: 0 0 10px; margin: 0 0 20px;
     border-bottom: 2px solid var(--brand);
     break-inside: avoid; page-break-inside: avoid;
     break-after: avoid; page-break-after: avoid;
   }
 
-  /* --- CLOSING: investment band + CTA, paired so the band never orphans ----
-     .closing wraps the band and CTA together with break-inside:avoid; if it
-     can't fit it moves to the next page as a unit — the no-prices budget band
-     never strands or sits half-cut on its own. */
-  /* No avoid on the wrapper — let the closing begin at the bottom of a page
-     instead of forcing the whole block onto a fresh (near-empty) page. The
-     .invest band keeps its own break-inside:avoid so the budget never splits. */
-  .closing { margin-top: 28px; }
-  /* Open editorial block — no filled box. A strong red top rule + dark text +
-     a big red value reads premium and prints perfectly clean. */
+  /* ====================================================================
+     CLOSING — investment band + CTA. Open editorial block: a strong red top
+     rule + dark label + a big red value reads premium and prints perfectly
+     clean (no filled box, no shadow). The .invest band keeps break-inside
+     avoid so the budget never splits. */
+  .closing { margin-top: 32px; }
   .invest {
-    padding: 18px 4px 0; border-top: 3px solid var(--brand);
+    padding: 20px 4px 0; border-top: 3px solid var(--brand);
     break-inside: avoid; page-break-inside: avoid;
   }
   .invest-cap {
-    font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase;
-    color: var(--ink-4); margin-bottom: 8px;
+    font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--ink-4); margin-bottom: 10px;
   }
   .invest-row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
   .invest-label { font-weight: 700; font-size: 18px; color: var(--ink); }
-  .invest-value { font-weight: 800; font-size: 34px; color: var(--brand-deep); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .invest-value { font-weight: 800; font-size: 36px; color: var(--brand-deep); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
   .invest-group {
     display: flex; justify-content: space-between; align-items: baseline;
-    margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);
+    margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line);
     color: var(--ink-3); font-size: 13.5px;
   }
   .invest-group-value { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
 
   .cta {
-    margin-top: 22px; padding: 18px 4px 0; text-align: center;
+    margin-top: 24px; padding: 20px 4px 0; text-align: center;
     border-top: 1px solid var(--line);
     break-inside: avoid; page-break-inside: avoid;
   }
   .cta-line {
     font-family: 'Frank Ruhl Libre', 'Heebo', serif;
-    font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 8px;
+    font-size: 23px; font-weight: 700; color: var(--ink); margin-bottom: 8px;
   }
   .cta-contact { font-size: 13.5px; color: var(--ink-3); }
   .cta-brand { font-weight: 700; color: var(--ink); }
