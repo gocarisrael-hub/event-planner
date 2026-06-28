@@ -2,12 +2,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { whenLabel } from '../utils/format.js';
+import { useCatalogStore } from '../store/useCatalogStore.js';
 
 export default function Dashboard() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
+  const [client, setClient] = useState('');
   const navigate = useNavigate();
+
+  const clients = useCatalogStore((s) => s.clients);
+  const catalogLoaded = useCatalogStore((s) => s.loaded);
+  const loadCatalog = useCatalogStore((s) => s.load);
 
   useEffect(() => {
     api.listEvents().then((e) => {
@@ -16,14 +22,29 @@ export default function Dashboard() {
     });
   }, []);
 
+  useEffect(() => {
+    if (!catalogLoaded) loadCatalog();
+  }, [catalogLoaded, loadCatalog]);
+
+  // Client options: the managed clients list, plus any legacy client_name
+  // values present on events that aren't in the managed list.
+  const clientOptions = useMemo(() => {
+    const names = new Set(clients.map((c) => c.name).filter(Boolean));
+    for (const ev of events) {
+      if (ev.client_name && ev.client_name.trim()) names.add(ev.client_name);
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b, 'he'));
+  }, [clients, events]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return events;
     return events.filter((ev) => {
+      if (client && ev.client_name !== client) return false;
+      if (!q) return true;
       const fields = [ev.title, ev.client_name, ev.audience];
       return fields.some((f) => (f || '').toLowerCase().includes(q));
     });
-  }, [events, query]);
+  }, [events, query, client]);
 
   const remove = async (e, id) => {
     e.preventDefault();
@@ -45,13 +66,27 @@ export default function Dashboard() {
       </div>
 
       {!loading && events.length > 0 && (
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="חיפוש לפי שם היום או הצוות…"
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 mb-6 focus:outline-none focus:border-ocar"
-        />
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="חיפוש לפי שם היום או הצוות…"
+            className="flex-1 border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-ocar"
+          />
+          <select
+            value={client}
+            onChange={(e) => setClient(e.target.value)}
+            className="sm:w-56 border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-ocar"
+          >
+            <option value="">כל הלקוחות</option>
+            {clientOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
 
       {loading ? (
@@ -65,7 +100,11 @@ export default function Dashboard() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center">
-          <p className="text-slate-500">לא נמצאו ימים שמתאימים לחיפוש.</p>
+          <p className="text-slate-500">
+            {client && !query.trim()
+              ? `לא נמצאו ימים עבור הלקוח ${client}.`
+              : 'לא נמצאו ימים שמתאימים לסינון.'}
+          </p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
