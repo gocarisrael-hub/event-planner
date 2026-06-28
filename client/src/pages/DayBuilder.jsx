@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { brand } from '../brand/brand.js';
@@ -196,7 +196,7 @@ const field =
 
 // Inline editor for the day's intake details. Mirrors NewDay's fields and the
 // "מתי?" date/month/season toggle; saves via updateEvent and then closes.
-function DayDetailsEditor({ event, onSave, onClose }) {
+const DayDetailsEditor = forwardRef(function DayDetailsEditor({ event, onSave, onClose }, ref) {
   const initialMode = event.target_month ? 'month' : event.target_season ? 'season' : 'date';
   const [whenMode, setWhenMode] = useState(initialMode);
   const [form, setForm] = useState({
@@ -241,6 +241,9 @@ function DayDetailsEditor({ event, onSave, onClose }) {
     await persist();
     onClose();
   };
+
+  // Let the parent's upper toggle button ("סגור ושמור") trigger save+close.
+  useImperativeHandle(ref, () => ({ saveAndClose }));
 
   return (
     <form onSubmit={save} className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 mb-5">
@@ -307,18 +310,14 @@ function DayDetailsEditor({ event, onSave, onClose }) {
       </div>
 
       <div className="flex gap-2 pt-1">
-        <button type="button" onClick={saveAndClose} disabled={saving}
-          className="bg-ocar text-white px-5 py-2 rounded-lg font-medium hover:opacity-90 disabled:opacity-60">
-          {saving ? 'שומר…' : 'סגור ושמור'}
-        </button>
         <button type="submit" disabled={saving}
-          className="px-5 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60">
+          className="bg-ocar text-white px-5 py-2 rounded-lg font-medium hover:opacity-90 disabled:opacity-60">
           {saving ? 'שומר…' : 'שמור שינויים'}
         </button>
       </div>
     </form>
   );
-}
+});
 
 export default function DayBuilder() {
   const { id } = useParams();
@@ -332,6 +331,7 @@ export default function DayBuilder() {
   const [draftError, setDraftError] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editDay, setEditDay] = useState(false);
+  const editorRef = useRef(null);
   const [expandedMails, setExpandedMails] = useState({}); // { [message_id]: bool }
 
   // Private notes (auto-saved, debounced). Local state mirrors event.notes and
@@ -616,10 +616,13 @@ export default function DayBuilder() {
           </div>
           <button
             type="button"
-            onClick={() => setEditDay((v) => !v)}
+            onClick={() => {
+              if (editDay) editorRef.current?.saveAndClose();
+              else setEditDay(true);
+            }}
             className="flex-shrink-0 text-sm border border-slate-300 rounded-lg px-3 py-1.5 text-slate-600 hover:border-ocar hover:text-ocar"
           >
-            {editDay ? 'סגור עריכה' : 'ערוך פרטי יום'}
+            {editDay ? 'סגור ושמור' : 'ערוך פרטי יום'}
           </button>
         </div>
         <p className="text-slate-500 mb-5 text-sm">
@@ -630,6 +633,7 @@ export default function DayBuilder() {
 
         {editDay && (
           <DayDetailsEditor
+            ref={editorRef}
             event={event}
             onSave={updateEvent}
             onClose={() => setEditDay(false)}
