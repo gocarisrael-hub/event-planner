@@ -67,6 +67,34 @@ async function readLogoDataUri() {
   }
 }
 
+// Bundled fallback hero ("fun people") used when an event has no cover_photo and
+// no activity/option photos at all, so the PDF always opens with a lively photo
+// instead of the branded dark band. Embedded as a base64 data URI (Puppeteer has
+// no base URL). Returns null if the file is missing so the branded cover stands in.
+const DEFAULT_HERO_PATH = join(__dirname, '..', 'assets', 'default-hero.jpg');
+
+async function readDefaultHeroDataUri() {
+  try {
+    const buf = await readFile(DEFAULT_HERO_PATH);
+    return `data:image/jpeg;base64,${buf.toString('base64')}`;
+  } catch {
+    return null;
+  }
+}
+
+// Does the event have any usable hero photo embedded in the photo map? Mirrors
+// the template's pickHero resolution (cover_photo → first activity/option photo).
+function hasEmbeddedHero(event, photos) {
+  if (event.cover_photo && photos[event.cover_photo]) return true;
+  for (const it of event.items || []) {
+    if (it.photos?.[0] && photos[it.photos[0]]) return true;
+    for (const o of it.options || []) {
+      if (o.photos?.[0] && photos[o.photos[0]]) return true;
+    }
+  }
+  return false;
+}
+
 // Gather the unique files attached to the catalog activities used by this
 // event's items (and their options). Deduped by file id; schedule order is
 // preserved (items in schedule order, then options within each item).
@@ -183,7 +211,15 @@ export async function generateProposalPdf(event, { prices } = { prices: false })
   const logo = await readLogoDataUri();
   // The hero/cover image: explicit cover_photo if present (and embeddable),
   // else the template derives one from the first activity photo in `photos`.
-  const cover = event.cover_photo ? photos[event.cover_photo] || null : null;
+  let cover = event.cover_photo ? photos[event.cover_photo] || null : null;
+  // Last resort: when the event has NO embeddable hero at all (no cover_photo and
+  // no activity/option photos resolved), fall back to the bundled default "fun
+  // people" hero so the top of the PDF always shows a lively photo instead of the
+  // branded dark band. If the default file is missing, readDefaultHeroDataUri
+  // returns null and the template renders the branded cover as before.
+  if (!cover && !hasEmbeddedHero(event, photos)) {
+    cover = await readDefaultHeroDataUri();
+  }
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
