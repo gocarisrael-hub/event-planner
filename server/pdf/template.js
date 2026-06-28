@@ -199,18 +199,22 @@ function itemHtml(it, { showPrices, photoMap }) {
 
     return `
       <article class="act">
-        <header class="act-head">
-          <h3 class="act-title">${esc(it.title)}</h3>
-          ${slotPrice}
-        </header>
-        ${mainPhoto ? `<div class="act-media">${mainPhoto}</div>` : ''}
-        <div class="act-time">
-          <span class="act-time-dot" aria-hidden="true"></span>
-          <span class="act-time-val"><bdi>${esc(tl)}</bdi></span>
-          ${durHtml}
+        <div class="act-row">
+          ${mainPhoto ? `<div class="act-thumb">${mainPhoto}</div>` : ''}
+          <div class="act-body">
+            <header class="act-head">
+              <h3 class="act-title">${esc(it.title)}</h3>
+              ${slotPrice}
+            </header>
+            <div class="act-time">
+              <span class="act-time-dot" aria-hidden="true"></span>
+              <span class="act-time-val"><bdi>${esc(tl)}</bdi></span>
+              ${durHtml}
+            </div>
+            ${it.description ? `<p class="act-desc">${esc(it.description)}</p>` : ''}
+            ${itemContact ? `<div class="act-contact">איש קשר: ${esc(itemContact)}</div>` : ''}
+          </div>
         </div>
-        ${it.description ? `<p class="act-desc">${esc(it.description)}</p>` : ''}
-        ${itemContact ? `<div class="act-contact">איש קשר: ${esc(itemContact)}</div>` : ''}
         ${optionsHtml}
       </article>`;
 }
@@ -434,30 +438,30 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
   bdi { font-variant-numeric: tabular-nums; }
   /* Generous page margins; the puppeteer footer band lives below the bottom
      padding so nothing clips. */
-  .page { background: var(--paper); padding: 36px 50px 40px; }
+  .page { background: var(--paper); padding: 28px 40px 32px; }
 
   /* ====================================================================
      COVER  — quiet wordmark, prominent hero photo, then the title + an
      elegant labeled metadata strip below it on white. No overlay text on
      the photo → always legible, nothing to band in print. */
-  .topbar { display: flex; align-items: center; gap: 11px; margin: 0 0 18px; }
-  .topbar-logo { height: 34px; width: auto; object-fit: contain; border-radius: 6px; }
+  .topbar { display: flex; align-items: center; gap: 11px; margin: 0 0 12px; }
+  .topbar-logo { height: 30px; width: auto; object-fit: contain; border-radius: 6px; }
   .topbar-word { font-size: 17px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
   .hero {
-    height: 320px; border-radius: 18px; overflow: hidden; background: var(--line-2);
+    height: 180px; border-radius: 14px; overflow: hidden; background: var(--line-2);
     break-inside: avoid; page-break-inside: avoid;
   }
   .hero-img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .cover-eyebrow {
     font-size: 11px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase;
-    color: var(--brand); margin: 26px 0 0;
+    color: var(--brand); margin: 16px 0 0;
   }
   .hero-title {
     font-family: 'Frank Ruhl Libre', 'Heebo', serif;
-    font-size: 40px; font-weight: 700; line-height: 1.1; color: var(--ink);
-    margin: 10px 0 0; break-after: avoid; page-break-after: avoid;
+    font-size: 30px; font-weight: 700; line-height: 1.12; color: var(--ink);
+    margin: 8px 0 0; break-after: avoid; page-break-after: avoid;
   }
-  .hero-rule { width: 56px; height: 3px; background: var(--brand); border-radius: 2px; margin: 18px 0 22px; }
+  .hero-rule { width: 52px; height: 3px; background: var(--brand); border-radius: 2px; margin: 12px 0 14px; }
 
   /* BRANDED COVER (no photo at all): a tasteful flat ink band, white title. */
   .cover {
@@ -489,8 +493,8 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
 
   /* Metadata strip: labeled cells separated by SUBTLE hairline dividers. */
   .cover-meta {
-    display: flex; flex-wrap: wrap; gap: 0 30px;
-    padding: 4px 0 4px; margin-bottom: 30px;
+    display: flex; flex-wrap: wrap; gap: 0 26px;
+    padding: 2px 0; margin-bottom: 18px;
   }
   .meta-cell {
     padding-inline-end: 30px; border-inline-end: 1px solid var(--line);
@@ -508,7 +512,7 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
      SCHEDULE — section label */
   .sched {
     font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
-    color: var(--brand); margin: 4px 0 22px;
+    color: var(--brand); margin: 2px 0 14px;
     break-after: avoid; page-break-after: avoid;
     display: flex; align-items: center; gap: 14px;
   }
@@ -521,61 +525,60 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
      everywhere: title → image → time → description → contact. Separation
      comes from generous spacing + a single hairline border (no shadow, no
      heavy frame). The whole card never splits across a page. */
+  /* Compact activity ROW: a small thumbnail beside the text, so days stay
+     dense (ideally one page). Card never splits across a page. */
   .act {
     background: var(--card);
     border: 1px solid var(--line);
-    border-radius: 18px;
-    padding: 26px 28px 28px;
-    margin-bottom: 22px;
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
     break-inside: avoid; page-break-inside: avoid;
   }
   .act:last-child { margin-bottom: 0; }
-  .act-head {
-    display: flex; justify-content: space-between; align-items: baseline; gap: 18px;
-    break-after: avoid; page-break-after: avoid;
-  }
-  .act-title {
-    font-size: 21px; font-weight: 700; color: var(--ink); line-height: 1.25; margin: 0;
-    letter-spacing: -.01em;
-  }
-  .act-price {
-    font-size: 17px; font-weight: 800; white-space: nowrap; flex-shrink: 0;
-    color: var(--brand-deep); font-variant-numeric: tabular-nums; align-self: flex-start;
-  }
-  /* Consistent image banner (visual consistency > size): full width, fixed
-     height, rounded. object-fit:cover keeps aspect ratio and never stretches. */
-  .act-media {
-    margin-top: 16px; border-radius: 14px; overflow: hidden; background: var(--line-2);
+  .act-row { display: flex; gap: 14px; align-items: flex-start; }
+  .act-thumb {
+    flex-shrink: 0; border-radius: 10px; overflow: hidden; background: var(--line-2);
     break-inside: avoid; page-break-inside: avoid;
   }
+  /* Small fixed-size thumbnail; object-fit:cover keeps aspect ratio, no stretch. */
   .act-photo {
-    width: 100%; height: 240px; object-fit: cover; display: block;
+    width: 112px; height: 84px; object-fit: cover; display: block;
     break-inside: avoid; page-break-inside: avoid;
   }
   img { break-inside: avoid; page-break-inside: avoid; }
-
-  /* TIME — the most scannable element: a distinct chip, visually separate from
-     the prose. Brand-red marker + bold tabular time + muted duration. */
+  .act-body { flex: 1; min-width: 0; }
+  .act-head {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 14px;
+    break-after: avoid; page-break-after: avoid;
+  }
+  .act-title {
+    font-size: 16px; font-weight: 700; color: var(--ink); line-height: 1.25; margin: 0;
+    letter-spacing: -.01em;
+  }
+  .act-price {
+    font-size: 15px; font-weight: 800; white-space: nowrap; flex-shrink: 0;
+    color: var(--brand-deep); font-variant-numeric: tabular-nums; align-self: flex-start;
+  }
+  /* TIME — scannable: red marker + bold tabular time + muted duration. */
   .act-time {
-    display: inline-flex; align-items: center; gap: 9px;
-    margin-top: 16px; padding: 7px 14px;
-    background: var(--paper); border: 1px solid var(--line); border-radius: 999px;
+    display: inline-flex; align-items: center; gap: 8px; margin-top: 6px;
   }
   .act-time-dot {
-    width: 8px; height: 8px; border-radius: 50%; background: var(--brand); flex-shrink: 0;
+    width: 7px; height: 7px; border-radius: 50%; background: var(--brand); flex-shrink: 0;
   }
   .act-time-val {
-    font-size: 15px; font-weight: 800; color: var(--ink);
+    font-size: 14px; font-weight: 800; color: var(--ink);
     font-variant-numeric: tabular-nums; letter-spacing: -.01em;
   }
-  .act-dur { font-size: 12px; font-weight: 600; color: var(--ink-3); }
-  .act-dur::before { content: "·"; margin-inline-end: 7px; color: var(--ink-4); }
+  .act-dur { font-size: 11.5px; font-weight: 600; color: var(--ink-3); }
+  .act-dur::before { content: "·"; margin-inline-end: 6px; color: var(--ink-4); }
 
   .act-desc {
-    font-size: 13px; line-height: 1.75; color: var(--ink-2);
-    margin: 14px 0 0; word-break: break-word; max-width: 64ch;
+    font-size: 12px; line-height: 1.6; color: var(--ink-2);
+    margin: 7px 0 0; word-break: break-word;
   }
-  .act-contact { font-size: 12px; color: var(--ink-3); margin-top: 12px; }
+  .act-contact { font-size: 11.5px; color: var(--ink-3); margin-top: 7px; }
 
   /* --- Choice / option block (inside an activity card) --- */
   .options {
