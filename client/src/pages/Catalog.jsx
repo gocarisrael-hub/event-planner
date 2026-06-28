@@ -116,6 +116,7 @@ export default function Catalog() {
   const [editing, setEditing] = useState(null); // id
   const [filter, setFilter] = useState(''); // category filter
   const [locFilter, setLocFilter] = useState(''); // location (מרחב) filter
+  const [query, setQuery] = useState(''); // free-text search
 
   useEffect(() => { if (!loaded) load(); }, [loaded]);
 
@@ -136,13 +137,19 @@ export default function Catalog() {
     [catalog]
   );
 
-  const shown = useMemo(
-    () =>
-      catalog.filter(
-        (c) => (!filter || c.category === filter) && (!locFilter || c.location === locFilter)
-      ),
-    [catalog, filter, locFilter]
-  );
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return catalog.filter((c) => {
+      if (filter && c.category !== filter) return false;
+      if (locFilter && c.location !== locFilter) return false;
+      if (q) {
+        const hay = [c.title, c.description, c.category, c.location, c.contact_name, c.contact_phone]
+          .filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [catalog, filter, locFilter, query]);
 
   return (
     <div>
@@ -178,6 +185,15 @@ export default function Catalog() {
           + הוסף לקטלוג
         </button>
       </div>
+
+      {/* Free-text search */}
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="חיפוש בקטלוג… (שם, תיאור, איש קשר)"
+        className="w-full border border-slate-300 rounded-lg px-3 py-2 mb-4 focus:outline-none focus:border-ocar"
+      />
 
       {/* Filter by category */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
