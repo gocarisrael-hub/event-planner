@@ -241,7 +241,7 @@ export async function generateProposalPdf(event, { prices, budget = true } = { p
           <span>star הפקות · בונים ימי כיף וימי גיבוש</span>
           <span>עמוד <span class="pageNumber"></span> / <span class="totalPages"></span></span>
         </div>`,
-      margin: { top: '6mm', bottom: '12mm', left: '0mm', right: '0mm' },
+      margin: { top: '5mm', bottom: '8mm', left: '0mm', right: '0mm' },
     });
     // Modern Puppeteer returns a Uint8Array; normalize to a Node Buffer so
     // callers can rely on buffer.toString('base64') etc.
