@@ -116,14 +116,16 @@ export default function DatePicker({ value, onChange }) {
           className="absolute top-full mt-2 right-0 z-50 w-80 bg-white rounded-xl border border-slate-200 shadow-xl p-3"
           role="dialog"
         >
-          <div className="flex items-center justify-between mb-2">
+          {/* dir=ltr makes the positions deterministic: prev on the left, next
+              on the right — each button shows the glyph that points to its side. */}
+          <div dir="ltr" className="flex items-center justify-between mb-2">
             <button
               type="button"
               onClick={() => goMonth(-1)}
               className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
               aria-label="חודש קודם"
             >
-              ›
+              ‹
             </button>
             <span className="text-sm font-semibold text-slate-800">{monthLabel}</span>
             <button
@@ -132,7 +134,7 @@ export default function DatePicker({ value, onChange }) {
               className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
               aria-label="חודש הבא"
             >
-              ‹
+              ›
             </button>
           </div>
 
