@@ -127,11 +127,10 @@ function onGmailMessage(e) {
   }
 
   // If a day already exists for this thread, show a prominent banner at the
-  // top (above the info section) and make sure the thread carries the label.
+  // top (above the info section). The thread is already labeled at create/link
+  // time, so we do NOT write a Gmail label here — that keeps the panel fast.
   var existingDay = fetchEventByThread_(conf, threadId);
   if (existingDay && existingDay.exists) {
-    tagThreadAsDay_(message);
-
     var bannerText = '<b><font color="#188038">✓ כבר קיים יום לפנייה הזו</font></b>';
     if (existingDay.title) {
       bannerText += '<br>' + escapeHtml_(existingDay.title);
@@ -219,8 +218,33 @@ function onGmailMessage(e) {
  * Asks the backend whether a day already exists for this Gmail thread.
  * Returns { exists, id, title } or { exists:false } on any failure.
  */
+// Cache the thread→day lookup so re-opening a mail's panel is instant instead
+// of waiting on a backend round-trip (Railway can be slow to wake) every time.
+var THREAD_CACHE_TTL = 180; // seconds
+
+function threadCacheKey_(threadId) { return 'evbythread:' + threadId; }
+
+// Store a known result for a thread (called after create/link so the banner is
+// immediate and correct on the next open).
+function cacheThreadResult_(threadId, data) {
+  if (!threadId) return;
+  try {
+    CacheService.getUserCache().put(
+      threadCacheKey_(threadId), JSON.stringify(data || { exists: false }), THREAD_CACHE_TTL
+    );
+  } catch (err) { /* cache is best-effort */ }
+}
+
 function fetchEventByThread_(conf, threadId) {
   if (!conf || !conf.ok || !threadId) return { exists: false };
+  var cache = null;
+  try { cache = CacheService.getUserCache(); } catch (err) { cache = null; }
+  if (cache) {
+    var hit = cache.get(threadCacheKey_(threadId));
+    if (hit) {
+      try { return JSON.parse(hit); } catch (err) { /* fall through to fetch */ }
+    }
+  }
   try {
     var resp = UrlFetchApp.fetch(
       conf.backendUrl + '/api/addon/event-by-thread?thread_id=' +
@@ -233,7 +257,9 @@ function fetchEventByThread_(conf, threadId) {
     );
     if (resp.getResponseCode() !== 200) return { exists: false };
     var data = JSON.parse(resp.getContentText());
-    return data && data.exists ? data : { exists: false };
+    var result = data && data.exists ? data : { exists: false };
+    if (cache) cacheThreadResult_(threadId, result);
+    return result;
   } catch (err) {
     return { exists: false };
   }
@@ -317,6 +343,7 @@ function createDay(e) {
   }
 
   tagThreadAsDay_(message);
+  cacheThreadResult_(message.getThread().getId(), { exists: true, id: data.event_id, title: data.title || '' });
 
   // Build a result card with an OpenLink to the new day.
   var card = CardService.newCardBuilder()
@@ -414,6 +441,7 @@ function linkDay(e) {
   }
 
   tagThreadAsDay_(message);
+  cacheThreadResult_(message.getThread().getId(), { exists: true, id: data.event_id, title: data.title || '' });
 
   var card = CardService.newCardBuilder()
     .setHeader(CardService.newCardHeader().setTitle('המייל קושר ליום'))
