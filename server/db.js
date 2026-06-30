@@ -179,6 +179,11 @@ function migrate(d) {
       c.files = [];
       changed = true;
     }
+    // Price type: per_person (default) or total (flat for the whole group).
+    if (!('default_price_type' in c)) {
+      c.default_price_type = 'per_person';
+      changed = true;
+    }
   }
   for (const ev of d.events || []) {
     // Migrate the legacy singular `email` to an `emails` array.
@@ -226,6 +231,11 @@ function migrate(d) {
       }
       delete it.price_min;
       delete it.price_max;
+      changed = true;
+    }
+    // Price type: per_person (default) or total (flat for the whole group).
+    if (!('price_type' in it)) {
+      it.price_type = 'per_person';
       changed = true;
     }
   }

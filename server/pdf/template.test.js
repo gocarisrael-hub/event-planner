@@ -131,6 +131,51 @@ test('options_mode:false (or absent) renders single schedule, no A/B labels', ()
   }
 });
 
+test('price_type:total contributes a FLAT amount to the group total', () => {
+  // One flat total-priced ₪1000 item over a group of 10 → group ₪1000,
+  // per-person ₪100 (1000 / 10). The total-priced item is tagged סה״כ.
+  const html = proposalHtml(
+    {
+      title: 'יום',
+      group_size: 10,
+      items: [{ title: 'אולם', price: 1000, price_type: 'total' }],
+    },
+    { prices: true, photos: {}, logo: null },
+  );
+  assert.ok(html.includes('₪1000'), 'expected the flat item price ₪1000');
+  assert.ok(html.includes('₪100'), 'expected per-person ₪100 (1000/10)');
+  assert.ok(html.includes('class="price-tag"'), 'expected the סה״כ price tag on a total item');
+});
+
+test('per_person price contributes price×N to the group total', () => {
+  const html = proposalHtml(
+    {
+      title: 'יום',
+      group_size: 10,
+      items: [{ title: 'פעילות', price: 50, price_type: 'per_person' }],
+    },
+    { prices: true, photos: {}, logo: null },
+  );
+  assert.ok(html.includes('₪500'), 'expected group total ₪500 (50×10)');
+});
+
+test('mixed types: flat total + per_person sum correctly per group and per head', () => {
+  // ₪1000 flat + ₪50/head over 10 → group 1000 + 500 = 1500, per-head 150.
+  const html = proposalHtml(
+    {
+      title: 'יום',
+      group_size: 10,
+      items: [
+        { title: 'אולם', price: 1000, price_type: 'total' },
+        { title: 'פעילות', price: 50, price_type: 'per_person' },
+      ],
+    },
+    { prices: true, photos: {}, logo: null },
+  );
+  assert.ok(html.includes('₪1500'), 'expected group total ₪1500');
+  assert.ok(html.includes('₪150'), 'expected per-person ₪150');
+});
+
 test('requests text never appears in the PDF', () => {
   const html = proposalHtml(
     { title: 'א', requests: 'אנחנו רוצים משהו מיוחד', items: [] },

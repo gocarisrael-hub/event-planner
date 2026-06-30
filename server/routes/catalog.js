@@ -33,6 +33,7 @@ router.post('/', (req, res) => {
     category: b.category || '',
     default_duration_hours: b.default_duration_hours ?? null,
     default_price: b.default_price ?? null,
+    default_price_type: b.default_price_type === 'total' ? 'total' : 'per_person',
     contact_name: b.contact_name || '',
     contact_phone: b.contact_phone || '',
     location: b.location || '',
