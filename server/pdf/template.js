@@ -437,12 +437,9 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
   // The warm closing CTA + contact — always present, paired with the band.
   const ctaHtml = `
     <div class="cta">
-      <div class="cta-line">נשמח לתאם ולצאת לדרך 🎉</div>
-      <div class="cta-contact">
-        <span class="cta-brand">${esc(BRAND.name)}</span>
-        <span class="meta-dot">·</span>
-        <bdi>${esc(BRAND.contact)}</bdi>
-      </div>
+      <span class="cta-line">נשמח לתאם ולצאת לדרך 🎉</span>
+      <span class="meta-dot">·</span>
+      <span class="cta-contact"><span class="cta-brand">${esc(BRAND.name)}</span> <bdi>${esc(BRAND.contact)}</bdi></span>
     </div>`;
 
   const closingHtml = `
@@ -489,7 +486,7 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
   .topbar-logo { height: 30px; width: auto; object-fit: contain; border-radius: 6px; }
   .topbar-word { font-size: 17px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
   .hero {
-    height: 92px; border-radius: 12px; overflow: hidden; background: var(--line-2);
+    height: 78px; border-radius: 12px; overflow: hidden; background: var(--line-2);
     break-inside: avoid; page-break-inside: avoid;
   }
   .hero-img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -535,7 +532,7 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
   /* Metadata strip: labeled cells separated by SUBTLE hairline dividers. */
   .cover-meta {
     display: flex; flex-wrap: wrap; gap: 0 26px;
-    padding: 2px 0; margin-bottom: 10px;
+    padding: 2px 0; margin-bottom: 8px;
   }
   .meta-cell {
     padding-inline-end: 30px; border-inline-end: 1px solid var(--line);
@@ -553,7 +550,7 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
      SCHEDULE — section label */
   .sched {
     font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
-    color: var(--brand); margin: 2px 0 10px;
+    color: var(--brand); margin: 2px 0 8px;
     break-after: avoid; page-break-after: avoid;
     display: flex; align-items: center; gap: 14px;
   }
@@ -572,8 +569,8 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
     background: var(--card);
     border: 1px solid var(--line);
     border-radius: 12px;
-    padding: 10px 13px;
-    margin-bottom: 6px;
+    padding: 8px 12px;
+    margin-bottom: 5px;
     break-inside: avoid; page-break-inside: avoid;
   }
   .act:last-child { margin-bottom: 0; }
@@ -621,8 +618,8 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
   .act-dur::before { content: "·"; margin-inline-end: 6px; color: var(--ink-4); }
 
   .act-desc {
-    font-size: 11.5px; line-height: 1.45; color: var(--ink-2);
-    margin: 5px 0 0; word-break: break-word;
+    font-size: 11px; line-height: 1.4; color: var(--ink-2);
+    margin: 4px 0 0; word-break: break-word;
   }
   .act-contact { font-size: 11px; color: var(--ink-3); margin-top: 5px; }
 
@@ -705,13 +702,15 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
   }
   .invest-group-value { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
 
+  /* One compact centered line so it never orphans onto a new page. */
   .cta {
-    margin-top: 6px; padding: 0; text-align: center;
+    margin-top: 10px; padding: 0; text-align: center;
+    display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 8px;
     break-inside: avoid; page-break-inside: avoid;
   }
   .cta-line {
     font-family: 'Frank Ruhl Libre', 'Heebo', serif;
-    font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 4px;
+    font-size: 16px; font-weight: 700; color: var(--ink);
   }
   .cta-contact { font-size: 12px; color: var(--ink-3); }
   .cta-brand { font-weight: 700; color: var(--ink); }
