@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCatalogStore } from '../store/useCatalogStore.js';
 import { useEventStore } from '../store/useEventStore.js';
 import { formatPrice } from '../utils/format.js';
@@ -83,12 +83,45 @@ function AddOptionRow({ onAdd }) {
 // there are no start/end fields here — only an explicit duration (which
 // resizes the block) plus description, category, contact, price, photos and
 // alternatives (choice block).
-export default function TimelineItem({ item, onChange, onRemove, onClose }) {
-  const set = (patch) => onChange(item.id, patch);
+// Item field → catalog field, for the optional "also update the catalog" sync.
+const ITEM_TO_CATALOG = {
+  title: 'title',
+  description: 'description',
+  category: 'category',
+  contact_name: 'contact_name',
+  contact_phone: 'contact_phone',
+  location: 'location',
+  price: 'default_price',
+  price_type: 'default_price_type',
+  approx_duration_hours: 'default_duration_hours',
+  photos: 'photos',
+};
 
+export default function TimelineItem({ item, onChange, onRemove, onClose }) {
   const addOption = useEventStore((s) => s.addOption);
   const updateOption = useEventStore((s) => s.updateOption);
   const removeOption = useEventStore((s) => s.removeOption);
+  const updateCatalog = useCatalogStore((s) => s.updateCatalog);
+
+  // "Also update the linked catalog activity." Local to the editor, off by
+  // default, and reset whenever a different item is opened.
+  const [syncCatalog, setSyncCatalog] = useState(false);
+  const linkedCatalogId = item.catalog_activity_id || null;
+  useEffect(() => { setSyncCatalog(false); }, [item.id]);
+
+  const set = (patch) => {
+    onChange(item.id, patch);
+    // Mirror the edited fields onto the linked catalog activity when asked.
+    if (syncCatalog && linkedCatalogId) {
+      const cat = {};
+      for (const [k, v] of Object.entries(patch)) {
+        if (k in ITEM_TO_CATALOG) cat[ITEM_TO_CATALOG[k]] = v;
+      }
+      // Ignore failures (e.g. the catalog entry was deleted → 404) so the
+      // item edit is never blocked.
+      if (Object.keys(cat).length) updateCatalog(linkedCatalogId, cat).catch(() => {});
+    }
+  };
 
   const options = item.options || [];
   const hasOptions = options.length > 0;
@@ -152,6 +185,17 @@ export default function TimelineItem({ item, onChange, onRemove, onClose }) {
               מחיר (₪)
               <input type="number" className={field} value={item.price ?? ''}
                 onChange={(e) => set({ price: e.target.value ? Number(e.target.value) : null })} />
+              {/* Price type — only meaningful for a plain item (no choices). */}
+              {!hasOptions && (
+                <select
+                  className={`${field} mt-1`}
+                  value={item.price_type === 'total' ? 'total' : 'per_person'}
+                  onChange={(e) => set({ price_type: e.target.value })}
+                >
+                  <option value="per_person">לאדם</option>
+                  <option value="total">סה״כ (לכל הקבוצה)</option>
+                </select>
+              )}
             </label>
           </div>
 
@@ -233,6 +277,18 @@ export default function TimelineItem({ item, onChange, onRemove, onClose }) {
               <AddOptionRow onAdd={(data) => addOption(item.id, data)} />
             </div>
           </div>
+
+          {/* Optionally mirror edits onto the linked catalog activity. */}
+          {linkedCatalogId && (
+            <label className="flex items-center gap-2 text-xs text-slate-600 border-t border-slate-100 pt-3">
+              <input
+                type="checkbox"
+                checked={syncCatalog}
+                onChange={(e) => setSyncCatalog(e.target.checked)}
+              />
+              עדכן גם בקטלוג (השינויים יחולו על הפעילות השמורה)
+            </label>
+          )}
 
           <div className="flex justify-between pt-1">
             <button onClick={() => { onRemove(item.id); onClose(); }} className="text-red-500 text-sm hover:underline">

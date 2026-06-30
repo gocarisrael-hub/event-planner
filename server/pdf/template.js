@@ -110,6 +110,39 @@ function total(items) {
   return { low, high };
 }
 
+// Group total accounting for each item's price TYPE (mirrors
+// client/src/utils/format.js groupTotal): choice blocks and per_person items
+// contribute priceRange×N, while a plain price_type==='total' item contributes
+// a FLAT amount (not ×N).
+function groupTotal(items, groupSize) {
+  const n = Number(groupSize) > 0 ? Number(groupSize) : 0;
+  let low = 0;
+  let high = 0;
+  for (const it of items) {
+    const hasOptions = (it.options || []).length > 0;
+    const r = priceRange(it);
+    if (!hasOptions && it.price_type === 'total') {
+      low += r.low;
+      high += r.high;
+    } else {
+      low += r.low * n;
+      high += r.high * n;
+    }
+  }
+  return { low, high };
+}
+
+// Per-person range: groupTotal/N (rounded whole ₪) with a group size; else the
+// sum of per-head priceRanges. Mirrors client/src/utils/format.js perPerson.
+function perPerson(items, groupSize) {
+  const n = Number(groupSize) > 0 ? Number(groupSize) : 0;
+  if (n > 0) {
+    const g = groupTotal(items, n);
+    return { low: Math.round(g.low / n), high: Math.round(g.high / n) };
+  }
+  return total(items);
+}
+
 function whenLabel(ev) {
   if (ev.target_date) return new Date(ev.target_date).toLocaleDateString('he-IL');
   if (ev.target_month) return ev.target_month;
@@ -161,7 +194,12 @@ function itemHtml(it, { showPrices, photoMap }) {
         const { low: lo, high: hi } = priceRange(it);
         slotPrice = `<div class="act-price"><bdi>${esc(formatRange(lo, hi))}</bdi></div>`;
       } else if (formatPrice(it.price)) {
-        slotPrice = `<div class="act-price"><bdi>${esc(formatPrice(it.price))}</bdi></div>`;
+        // A flat total-priced item (e.g. venue rental) is tagged סה״כ so it's
+        // not mistaken for a per-head figure.
+        const tag = it.price_type === 'total'
+          ? ' <span class="price-tag">סה״כ</span>'
+          : '';
+        slotPrice = `<div class="act-price"><bdi>${esc(formatPrice(it.price))}</bdi>${tag}</div>`;
       }
     }
 
@@ -219,19 +257,22 @@ function itemHtml(it, { showPrices, photoMap }) {
       </article>`;
 }
 
-// The totals band (per-person + group) for a given price range. Only rendered
-// by the caller when showPrices and high > 0.
-function totalsBand(low, high, groupSize, label = 'מחיר לאדם') {
+// The totals band (per-person + group) for a set of items, accounting for each
+// item's price TYPE. Only rendered by the caller when showPrices and the
+// schedule has any priced item.
+function totalsBand(items, groupSize, label = 'מחיר לאדם') {
+  const pp = perPerson(items, groupSize);
+  const g = groupTotal(items, groupSize);
   return `
       <div class="totals">
         <div class="totals-row">
           <span class="totals-label">${esc(label)}</span>
-          <span class="totals-value"><bdi>${esc(formatRange(low, high))}</bdi></span>
+          <span class="totals-value"><bdi>${esc(formatRange(pp.low, pp.high))}</bdi></span>
         </div>
         ${groupSize > 0 ? `
           <div class="totals-group">
             <span>סה״כ לקבוצה (×<bdi>${esc(groupSize)}</bdi>)</span>
-            <span class="totals-group-value"><bdi>${esc(formatRange(low * groupSize, high * groupSize))}</bdi></span>
+            <span class="totals-group-value"><bdi>${esc(formatRange(g.low, g.high))}</bdi></span>
           </div>` : ''}
       </div>`;
 }
@@ -242,9 +283,9 @@ function totalsBand(low, high, groupSize, label = 'מחיר לאדם') {
 function scheduleSection(rawItems, { showPrices, photoMap, groupSize, totalsLabel }) {
   const items = sortByStart(rawItems);
   const itemsHtml = items.map((it) => itemHtml(it, { showPrices, photoMap })).join('');
-  const { low, high } = total(items);
+  const { high } = total(items);
   const totalsHtml = showPrices && high > 0
-    ? totalsBand(low, high, groupSize, totalsLabel)
+    ? totalsBand(items, groupSize, totalsLabel)
     : '';
   return `<div class="items">${itemsHtml}</div>${totalsHtml}`;
 }
@@ -362,19 +403,21 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
   let closingBandHtml = '';
   if (showPrices) {
     if (!optionsMode) {
-      const { low, high } = total(allItems);
+      const { high } = total(allItems);
       if (high > 0) {
+        const pp = perPerson(allItems, groupSize);
+        const g = groupTotal(allItems, groupSize);
         closingBandHtml = `
           <div class="invest">
             <div class="invest-cap">ההשקעה ליום</div>
             <div class="invest-row">
               <span class="invest-label">מחיר לאדם</span>
-              <span class="invest-value"><bdi>${esc(formatRange(low, high))}</bdi></span>
+              <span class="invest-value"><bdi>${esc(formatRange(pp.low, pp.high))}</bdi></span>
             </div>
             ${groupSize > 0 ? `
               <div class="invest-group">
                 <span>סה״כ לקבוצה (×<bdi>${esc(groupSize)}</bdi>)</span>
-                <span class="invest-group-value"><bdi>${esc(formatRange(low * groupSize, high * groupSize))}</bdi></span>
+                <span class="invest-group-value"><bdi>${esc(formatRange(g.low, g.high))}</bdi></span>
               </div>` : ''}
           </div>`;
       }
@@ -559,6 +602,11 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
   .act-price {
     font-size: 15px; font-weight: 800; white-space: nowrap; flex-shrink: 0;
     color: var(--brand-deep); font-variant-numeric: tabular-nums; align-self: flex-start;
+  }
+  /* Tiny suffix flagging a flat total-priced item (e.g. venue rental). */
+  .price-tag {
+    font-size: 9.5px; font-weight: 600; color: var(--ink-4);
+    letter-spacing: .04em; margin-inline-start: 3px;
   }
   /* TIME — scannable: red marker + bold tabular time + muted duration. */
   .act-time {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, authHeaders } from '../api/client.js';
 import { brand } from '../brand/brand.js';
-import { formatDuration, formatPrice, formatRange, priceRange, sortByStart, timingLabel, total, whenLabel } from '../utils/format.js';
+import { formatDuration, formatPrice, formatRange, groupTotal, perPerson, priceRange, sortByStart, timingLabel, total, whenLabel } from '../utils/format.js';
 
 export default function ProposalPreview() {
   const { id } = useParams();
@@ -55,7 +55,10 @@ export default function ProposalPreview() {
   if (!event) return <p className="p-8 text-slate-400">טוען…</p>;
 
   const items = sortByStart(event.items || []);
-  const { low, high } = total(items);
+  const groupSize = event.group_size > 0 ? event.group_size : 0;
+  const { high } = total(items); // whether anything is priced (gates the band)
+  const pp = perPerson(items, groupSize);
+  const g = groupTotal(items, groupSize);
 
   // Hero image: explicit cover, else the first photo we can find on the schedule.
   const heroPhoto =
@@ -165,7 +168,12 @@ export default function ProposalPreview() {
                         ) : null}
                       </div>
                       {showPrices && !it.options?.length && formatPrice(it.price) && (
-                        <div className="text-sm font-semibold whitespace-nowrap">{formatPrice(it.price)}</div>
+                        <div className="text-sm font-semibold whitespace-nowrap">
+                          {formatPrice(it.price)}
+                          {it.price_type === 'total' && (
+                            <span className="mr-1 text-xs font-normal text-slate-400">סה״כ</span>
+                          )}
+                        </div>
                       )}
                       {showPrices && it.options?.length > 0 && (() => {
                         const { low: lo, high: hi } = priceRange(it);
@@ -224,13 +232,13 @@ export default function ProposalPreview() {
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-lg" style={{ color: brand.colors.dark }}>השקעה לאדם</span>
                   <span className="font-extrabold text-xl" style={{ color: brand.colors.primary }}>
-                    {formatRange(low, high)}
+                    {formatRange(pp.low, pp.high)}
                   </span>
                 </div>
-                {event.group_size > 0 && (
+                {groupSize > 0 && (
                   <div className="mt-1 flex items-center justify-between text-sm text-slate-500">
-                    <span>סה״כ לקבוצה (×{event.group_size})</span>
-                    <span className="font-medium">{formatRange(low * event.group_size, high * event.group_size)}</span>
+                    <span>סה״כ לקבוצה (×{groupSize})</span>
+                    <span className="font-medium">{formatRange(g.low, g.high)}</span>
                   </div>
                 )}
               </>

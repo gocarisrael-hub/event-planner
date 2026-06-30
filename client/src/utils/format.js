@@ -96,6 +96,42 @@ export function total(items) {
   return { low, high };
 }
 
+// Group total accounting for each item's price TYPE. For each item:
+//  - choice block (has options) → priceRange (item.price + option prices) × N.
+//  - plain item, price_type==='total' → a FLAT amount (NOT × N).
+//  - plain item, price_type==='per_person' (default) → priceRange × N.
+// Returns the {low, high} sum across all items for the whole group.
+export function groupTotal(items, groupSize) {
+  const n = Number(groupSize) > 0 ? Number(groupSize) : 0;
+  let low = 0;
+  let high = 0;
+  for (const it of items) {
+    const hasOptions = (it.options || []).length > 0;
+    const r = priceRange(it);
+    if (!hasOptions && it.price_type === 'total') {
+      low += r.low;
+      high += r.high;
+    } else {
+      low += r.low * n;
+      high += r.high * n;
+    }
+  }
+  return { low, high };
+}
+
+// Per-person price range. With a group size, it's groupTotal / N (rounded to
+// whole ₪ so a flat venue cost is fairly amortised across heads). With no
+// group size it falls back to the sum of per-head priceRanges (total-typed
+// flat amounts can't be amortised without N).
+export function perPerson(items, groupSize) {
+  const n = Number(groupSize) > 0 ? Number(groupSize) : 0;
+  if (n > 0) {
+    const g = groupTotal(items, n);
+    return { low: Math.round(g.low / n), high: Math.round(g.high / n) };
+  }
+  return total(items);
+}
+
 export const SEASONS = ['אביב', 'קיץ', 'סתיו', 'חורף'];
 export const MONTHS = [
   'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',

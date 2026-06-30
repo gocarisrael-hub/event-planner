@@ -1,11 +1,14 @@
-import { formatRange, total } from '../utils/format.js';
+import { formatRange, groupTotal, perPerson } from '../utils/format.js';
 
-// Budget is PER PERSON (לראש). Activity prices are per person too, so the
-// per-head cost compares directly to the budget; the group total is per-head × N.
+// Budget is PER PERSON (לראש). Per-head cost compares directly to the budget;
+// the group line is the type-aware group total (flat total-priced items are
+// counted once, not ×N). With a group size, total-priced items are amortised
+// across heads so the per-head figure stays honest.
 export default function BudgetMeter({ items, budget, groupSize }) {
-  const { low, high } = total(items);
-  const hasBudget = budget !== null && budget !== undefined && budget !== '';
   const n = Number(groupSize) || 0;
+  const { low, high } = perPerson(items, n);
+  const g = groupTotal(items, n);
+  const hasBudget = budget !== null && budget !== undefined && budget !== '';
   const over = hasBudget && high > Number(budget);
   const pct = hasBudget ? Math.min(100, Math.round((high / Number(budget)) * 100)) : 0;
 
@@ -19,7 +22,7 @@ export default function BudgetMeter({ items, budget, groupSize }) {
       {n > 0 && high > 0 && (
         <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
           <span>סה״כ לקבוצה (×{n})</span>
-          <span>{formatRange(low * n, high * n)}</span>
+          <span>{formatRange(g.low, g.high)}</span>
         </div>
       )}
 
