@@ -132,6 +132,20 @@ export function perPerson(items, groupSize) {
   return total(items);
 }
 
+// Internal profit for the WHOLE group (not per head): total budget minus the
+// type-aware group cost. Budget is per person, so total budget = budget × N.
+// Cost is a range ({low, high}), so profit is a range too — profit is HIGHEST
+// when cost is LOWEST. Returns null when we can't compute a meaningful group
+// profit (no positive budget, or no group size). Never shown in the client PDF.
+export function profitTotal(items, budget, groupSize) {
+  const b = Number(budget);
+  const n = Number(groupSize);
+  if (!(b > 0) || !(n > 0)) return null;
+  const totalBudget = b * n;
+  const cost = groupTotal(items, n);
+  return { low: totalBudget - cost.high, high: totalBudget - cost.low };
+}
+
 export const SEASONS = ['אביב', 'קיץ', 'סתיו', 'חורף'];
 export const MONTHS = [
   'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
