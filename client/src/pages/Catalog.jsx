@@ -105,7 +105,7 @@ function CatalogFiles({ item, onChanged }) {
 }
 const blank = {
   title: '', description: '', category: '',
-  default_duration_hours: '', default_price: '',
+  default_duration_hours: '', default_price: '', default_price_type: 'per_person',
   contact_name: '', contact_phone: '', location: '', photos: [],
 };
 
@@ -170,8 +170,15 @@ export default function Catalog() {
         <div className="grid grid-cols-2 gap-3">
           <input type="number" step="0.5" min="0" className={field} placeholder="משך (שעות)" value={draft.default_duration_hours}
             onChange={(e) => setDraft({ ...draft, default_duration_hours: e.target.value })} />
-          <input type="number" className={field} placeholder="מחיר (₪)" value={draft.default_price}
-            onChange={(e) => setDraft({ ...draft, default_price: e.target.value })} />
+          <div className="flex gap-2">
+            <input type="number" className={field} placeholder="מחיר (₪)" value={draft.default_price}
+              onChange={(e) => setDraft({ ...draft, default_price: e.target.value })} />
+            <select className={field} value={draft.default_price_type || 'per_person'}
+              onChange={(e) => setDraft({ ...draft, default_price_type: e.target.value })}>
+              <option value="per_person">לאדם</option>
+              <option value="total">סה״כ</option>
+            </select>
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <input className={field} placeholder="איש קשר" value={draft.contact_name}
@@ -240,8 +247,15 @@ export default function Catalog() {
                 <div className="grid grid-cols-2 gap-2">
                   <input type="number" step="0.5" min="0" className={field} value={c.default_duration_hours ?? ''} placeholder="שעות"
                     onChange={(e) => updateCatalog(c.id, { default_duration_hours: e.target.value ? Number(e.target.value) : null })} />
-                  <input type="number" className={field} value={c.default_price ?? ''} placeholder="מחיר (₪)"
-                    onChange={(e) => updateCatalog(c.id, { default_price: e.target.value ? Number(e.target.value) : null })} />
+                  <div className="flex gap-2">
+                    <input type="number" className={field} value={c.default_price ?? ''} placeholder="מחיר (₪)"
+                      onChange={(e) => updateCatalog(c.id, { default_price: e.target.value ? Number(e.target.value) : null })} />
+                    <select className={field} value={c.default_price_type || 'per_person'}
+                      onChange={(e) => updateCatalog(c.id, { default_price_type: e.target.value })}>
+                      <option value="per_person">לאדם</option>
+                      <option value="total">סה״כ</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <input className={field} value={c.contact_name || ''} placeholder="איש קשר"
