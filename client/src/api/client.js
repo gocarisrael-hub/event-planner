@@ -142,6 +142,8 @@ export const api = {
     if (!res.ok) throw new Error('upload failed');
     return res.json(); // file object
   },
+  updateCatalogFile: (catalogId, fileId, patch) =>
+    req('PATCH', `/api/catalog/${catalogId}/files/${fileId}`, patch),
   deleteCatalogFile: (catalogId, fileId) =>
     req('DELETE', `/api/catalog/${catalogId}/files/${fileId}`),
 

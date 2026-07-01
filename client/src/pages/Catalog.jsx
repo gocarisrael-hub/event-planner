@@ -56,9 +56,14 @@ function CatalogFiles({ item, onChanged }) {
     await onChanged();
   };
 
+  const onTogglePdf = async (file) => {
+    await api.updateCatalogFile(item.id, file.id, { in_pdf: !file.in_pdf });
+    await onChanged();
+  };
+
   return (
     <div className="mt-2 border-t border-slate-100 pt-2">
-      <div className="text-xs text-slate-400 mb-1">קבצים — יצורפו להצעת PDF כשהפעילות בשימוש</div>
+      <div className="text-xs text-slate-400 mb-1">קבצים — סמן "בהצעה" כדי לצרף קובץ להצעת ה-PDF ללקוח</div>
       <input ref={inputRef} type="file" multiple className="hidden" onChange={onPick} />
       <button
         type="button"
@@ -88,6 +93,20 @@ function CatalogFiles({ item, onChanged }) {
                 </a>
                 <div className="text-xs text-slate-400">{fileSize(file.size)}</div>
               </div>
+              <label
+                className={`flex-shrink-0 flex items-center gap-1 text-xs cursor-pointer px-1.5 py-0.5 rounded ${
+                  file.in_pdf ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-slate-400'
+                }`}
+                title="צרף קובץ זה להצעת ה-PDF ללקוח"
+              >
+                <input
+                  type="checkbox"
+                  checked={!!file.in_pdf}
+                  onChange={() => onTogglePdf(file)}
+                  className="accent-emerald-600"
+                />
+                בהצעה
+              </label>
               <button
                 type="button"
                 onClick={() => onDelete(file)}
@@ -104,7 +123,7 @@ function CatalogFiles({ item, onChanged }) {
   );
 }
 const blank = {
-  title: '', description: '', category: '',
+  title: '', description: '', notes: '', category: '',
   default_duration_hours: '', default_price: '', default_price_type: 'per_person',
   contact_name: '', contact_phone: '', location: '', photos: [],
 };
@@ -128,8 +147,11 @@ export default function Catalog() {
 
   const save = async () => {
     if (!draft.title.trim()) return;
-    await addCatalog(numify(draft));
+    const row = await addCatalog(numify(draft));
     setDraft(blank);
+    // Open the just-created activity in its full inline editor so files, notes
+    // and all options are immediately available (they're edit-only).
+    if (row && row.id) setEditing(row.id);
   };
 
   const locations = useMemo(
@@ -167,6 +189,8 @@ export default function Catalog() {
         </div>
         <textarea className={field} rows={3} placeholder="תיאור" value={draft.description}
           onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+        <textarea className={field} rows={2} placeholder="הערה פנימית (לא מופיע בהצעה ללקוח)" value={draft.notes}
+          onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
         <div className="grid grid-cols-2 gap-3">
           <input type="number" step="0.5" min="0" className={field} placeholder="משך (שעות)" value={draft.default_duration_hours}
             onChange={(e) => setDraft({ ...draft, default_duration_hours: e.target.value })} />
@@ -243,6 +267,8 @@ export default function Catalog() {
                 <input className={field} value={c.title} onChange={(e) => updateCatalog(c.id, { title: e.target.value })} />
                 <textarea className={field} rows={3} value={c.description || ''} placeholder="תיאור"
                   onChange={(e) => updateCatalog(c.id, { description: e.target.value })} />
+                <textarea className={field} rows={2} value={c.notes || ''} placeholder="הערה פנימית (לא מופיע בהצעה ללקוח)"
+                  onChange={(e) => updateCatalog(c.id, { notes: e.target.value })} />
                 <CategorySelect value={c.category} onChange={(category) => updateCatalog(c.id, { category })} />
                 <div className="grid grid-cols-2 gap-2">
                   <input type="number" step="0.5" min="0" className={field} value={c.default_duration_hours ?? ''} placeholder="שעות"

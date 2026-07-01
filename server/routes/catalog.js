@@ -30,6 +30,7 @@ router.post('/', (req, res) => {
   const row = catalog.insert({
     title: b.title || 'פעילות',
     description: b.description || '',
+    notes: b.notes || '', // internal note — NEVER shown in the client proposal PDF
     category: b.category || '',
     default_duration_hours: b.default_duration_hours ?? null,
     default_price: b.default_price ?? null,
@@ -65,11 +66,25 @@ router.post('/:id/files', fileUpload.single('file'), (req, res) => {
     type: req.file.mimetype,
     size: req.file.size,
     url: `/uploads/${req.file.filename}`,
+    // Opt-in: only files explicitly marked are appended to the proposal PDF.
+    in_pdf: false,
     uploaded_at: new Date().toISOString(),
   };
   const files = [...(row.files || []), file];
   catalog.update(row.id, { files });
   res.status(201).json(file);
+});
+
+// Toggle whether a catalog file is appended to the proposal PDF.
+router.patch('/:id/files/:fileId', (req, res) => {
+  const row = catalog.find(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  const files = row.files || [];
+  const file = files.find((f) => f.id === req.params.fileId);
+  if (!file) return res.status(404).json({ error: 'not found' });
+  file.in_pdf = !!(req.body || {}).in_pdf;
+  catalog.update(row.id, { files });
+  res.json(file);
 });
 
 router.delete('/:id/files/:fileId', (req, res) => {
