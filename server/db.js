@@ -189,10 +189,22 @@ function migrate(d) {
       delete c.default_price_max;
       changed = true;
     }
+    // Internal note (never shown in the client proposal PDF).
+    if (!('notes' in c)) {
+      c.notes = '';
+      changed = true;
+    }
     // Catalog activities can carry attached files (appended to proposal PDFs).
     if (!Array.isArray(c.files)) {
       c.files = [];
       changed = true;
+    }
+    // Per-file opt-in: only files with in_pdf=true are appended to the PDF.
+    for (const f of c.files) {
+      if (f && !('in_pdf' in f)) {
+        f.in_pdf = false;
+        changed = true;
+      }
     }
     // Price type: per_person (default) or total (flat for the whole group).
     if (!('default_price_type' in c)) {

@@ -107,6 +107,8 @@ function collectAttachments(event) {
     if (!c) return;
     for (const f of c.files || []) {
       if (!f || !f.id || seen.has(f.id)) continue;
+      // Only files explicitly marked for the proposal are appended.
+      if (f.in_pdf !== true) continue;
       seen.add(f.id);
       out.push(f);
     }
