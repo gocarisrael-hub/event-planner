@@ -100,9 +100,27 @@ router.get('/:id/proposal.pdf', async (req, res) => {
   // In no-prices mode the per-person budget band shows unless budget=false.
   const budget = req.query.budget !== 'false';
 
+  // Per-option export: when the event is in A/B options mode and ?option=A|B is
+  // given, render ONLY that option as a normal single-schedule proposal (not the
+  // stacked both-options layout). Option A = items where option !== 'B'.
+  const optionParam = req.query.option === 'A' || req.query.option === 'B' ? req.query.option : null;
+  const applyOption = optionParam && event.options_mode === true;
+  // The Hebrew label shown on the cover badge / in the filename.
+  const optionLabel = applyOption ? (optionParam === 'B' ? 'ב' : 'א') : null;
+
+  let renderEvent = withItems(event);
+  if (applyOption) {
+    const filtered = renderEvent.items.filter((it) =>
+      optionParam === 'B' ? it.option === 'B' : it.option !== 'B',
+    );
+    // Shallow copy with only this option's items and options_mode off, so the
+    // template renders a normal single schedule instead of the stacked sections.
+    renderEvent = { ...renderEvent, items: filtered, options_mode: false };
+  }
+
   let pdfBuffer;
   try {
-    pdfBuffer = await generateProposalPdf(withItems(event), { prices, budget });
+    pdfBuffer = await generateProposalPdf(renderEvent, { prices, budget, option: optionLabel });
   } catch (err) {
     return res
       .status(503)
@@ -120,7 +138,11 @@ router.get('/:id/proposal.pdf', async (req, res) => {
     .trim();
   // Three variants: with prices / no prices (with budget) / no prices, no budget.
   const suffix = prices ? ' (עם מחירים)' : budget ? '' : ' (ללא תקציב)';
-  const name = base ? `הצעה – ${base}${suffix}.pdf` : `הצעה${suffix}.pdf`;
+  // When exporting a single option, insert "אופציה א/ב" before the variant suffix.
+  const optionPart = optionLabel ? ` – אופציה ${optionLabel}` : '';
+  const name = base
+    ? `הצעה – ${base}${optionPart}${suffix}.pdf`
+    : `הצעה${optionPart}${suffix}.pdf`;
   const utf8Name = encodeURIComponent(name);
   res.set('Content-Type', 'application/pdf');
   res.set(

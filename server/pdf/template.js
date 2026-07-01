@@ -309,7 +309,7 @@ function pickHero(event, photoMap) {
   return null;
 }
 
-export function proposalHtml(event, { prices, budget, photos, logo, cover } = { prices: false, budget: true, photos: {}, logo: null, cover: null }) {
+export function proposalHtml(event, { prices, budget, photos, logo, cover, option } = { prices: false, budget: true, photos: {}, logo: null, cover: null, option: null }) {
   const photoMap = photos || {};
   const logoUri = logo || null;
   const showPrices = Boolean(prices);
@@ -338,6 +338,14 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
         .join('')}</div>`
     : '';
 
+  // When rendering a single A/B option as its own standalone proposal (the
+  // route filters items + turns options_mode off), show a small "אופציה X" badge
+  // on the cover so the client can tell which option this proposal is. Flat fill,
+  // no gradients/shadows — print-safe.
+  const optionBadge = option
+    ? `<div class="option-badge">אופציה ${esc(option)}</div>`
+    : '';
+
   // The wordmark lockup, reused on the branded (no-photo) cover.
   const wordmarkLockup = (variant) => `
     <div class="cover-brand cover-brand--${variant}">
@@ -357,6 +365,7 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
         <span class="topbar-word">${esc(BRAND.name)}</span>
       </div>
       <div class="hero"><img class="hero-img" src="${heroUri}" alt="" /></div>
+      ${optionBadge}
       <div class="cover-eyebrow">${esc(BRAND.tagline)}</div>
       <h1 class="hero-title">${esc(event.title || '')}</h1>
       <div class="hero-rule"></div>
@@ -365,6 +374,7 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
       <div class="cover cover--brand">
         ${wordmarkLockup('brand')}
         <div class="cover-text">
+          ${optionBadge ? `<div class="option-badge option-badge--on-dark">אופציה ${esc(option)}</div>` : ''}
           <div class="cover-eyebrow cover-eyebrow--on-dark">${esc(BRAND.tagline)}</div>
           <h1 class="cover-title">${esc(event.title || '')}</h1>
         </div>
@@ -500,6 +510,14 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover } = { 
     margin: 6px 0 0; break-after: avoid; page-break-after: avoid;
   }
   .hero-rule { width: 48px; height: 3px; background: var(--brand); border-radius: 2px; margin: 8px 0 10px; }
+
+  /* Standalone-option badge: flat brand pill, print-safe (no gradient/shadow). */
+  .option-badge {
+    display: inline-block; margin: 14px 0 0; padding: 4px 13px; border-radius: 999px;
+    background: var(--brand); color: #fff;
+    font-size: 11px; font-weight: 800; letter-spacing: .16em;
+  }
+  .option-badge--on-dark { margin: 0 0 10px; }
 
   /* BRANDED COVER (no photo at all): a tasteful flat ink band, white title. */
   .cover {
