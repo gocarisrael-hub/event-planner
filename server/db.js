@@ -14,6 +14,7 @@ const EMPTY = {
   categories: [],
   spaces: [],
   clients: [],
+  owners: [],
   catalog: [],
   events: [],
   items: [],
@@ -21,6 +22,9 @@ const EMPTY = {
   users: [],
   sessions: [],
 };
+
+// Default seeded אחראי (person in charge / owner) list.
+const DEFAULT_OWNERS = ['הדר', 'נבו'];
 
 // --- Password hashing (node:crypto scrypt, no native deps) -----------------
 // Returns { password_hash, salt } both as hex strings.
@@ -59,6 +63,7 @@ function seed() {
     categories: DEFAULT_CATEGORIES.map((name) => ({ id: randomUUID(), name })),
     spaces: [],
     clients: [],
+    owners: DEFAULT_OWNERS.map((name) => ({ id: randomUUID(), name })),
     catalog: [
       {
         id: randomUUID(),
@@ -145,6 +150,16 @@ function migrate(d) {
     d.clients = [];
     changed = true;
   }
+  // Owners (אחראי) are a managed defined list, like clients/spaces.
+  if (!Array.isArray(d.owners)) {
+    d.owners = [];
+    changed = true;
+  }
+  // Seed the two default owners once (when empty) so existing installs get them.
+  if (d.owners.length === 0) {
+    d.owners = DEFAULT_OWNERS.map((name) => ({ id: randomUUID(), name }));
+    changed = true;
+  }
   // Seed each list once (when empty) from existing free-text data so existing
   // installs keep their מרחב / לקוח values as selectable options.
   if (d.spaces.length === 0) {
@@ -197,6 +212,11 @@ function migrate(d) {
     }
     if (!('notes' in ev)) {
       ev.notes = '';
+      changed = true;
+    }
+    // אחראי (person in charge) — default to empty when missing.
+    if (!('owner' in ev)) {
+      ev.owner = '';
       changed = true;
     }
     if (!Array.isArray(ev.files)) {
@@ -300,6 +320,7 @@ function col(name) {
 export const categories = col('categories');
 export const spaces = col('spaces');
 export const clients = col('clients');
+export const owners = col('owners');
 export const catalog = col('catalog');
 export const events = col('events');
 export const items = col('items');

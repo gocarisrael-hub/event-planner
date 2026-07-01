@@ -5,7 +5,7 @@ import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Router } from 'express';
 import multer from 'multer';
-import { catalog, categories, clients, spaces } from '../db.js';
+import { catalog, categories, clients, owners, spaces } from '../db.js';
 
 const router = Router();
 
@@ -122,3 +122,15 @@ clientRouter.post('/', (req, res) => {
   res.status(201).json(clients.insert({ name }));
 });
 clientRouter.delete('/:id', (req, res) => res.json({ ok: clients.remove(req.params.id) }));
+
+// --- Owners (אחראי; defined list; mounted separately in index.js) ----------
+export const ownerRouter = Router();
+ownerRouter.get('/', (_req, res) => res.json(owners.all()));
+ownerRouter.post('/', (req, res) => {
+  const name = (req.body?.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'name required' });
+  const existing = owners.all().find((o) => o.name === name);
+  if (existing) return res.status(200).json(existing);
+  res.status(201).json(owners.insert({ name }));
+});
+ownerRouter.delete('/:id', (req, res) => res.json({ ok: owners.remove(req.params.id) }));

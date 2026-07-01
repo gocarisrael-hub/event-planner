@@ -5,6 +5,7 @@ import { brand } from '../brand/brand.js';
 import { whenLabel } from '../utils/format.js';
 import StatusSelect from '../components/StatusSelect.jsx';
 import { useStatusStore } from '../store/useStatusStore.js';
+import { useCatalogStore } from '../store/useCatalogStore.js';
 import { useAuthStore } from '../store/useAuthStore.js';
 import { statusLabel, statusBadgeClass } from '../utils/status.js';
 
@@ -14,6 +15,7 @@ export default function EventsTable() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
+  const [ownerFilter, setOwnerFilter] = useState(''); // '' = all owners
   const [sortKey, setSortKey] = useState('sent'); // default sort by נשלח
   const [sortDir, setSortDir] = useState('desc');
 
@@ -22,9 +24,18 @@ export default function EventsTable() {
   const loadStatuses = useStatusStore((s) => s.load);
   const statuses = useStatusStore((s) => s.statuses);
 
+  // Managed אחראי list (for the filter dropdown options).
+  const catalogLoaded = useCatalogStore((s) => s.loaded);
+  const loadCatalog = useCatalogStore((s) => s.load);
+  const owners = useCatalogStore((s) => s.owners);
+
   useEffect(() => {
     if (!statusesLoaded) loadStatuses();
   }, [statusesLoaded, loadStatuses]);
+
+  useEffect(() => {
+    if (!catalogLoaded) loadCatalog();
+  }, [catalogLoaded, loadCatalog]);
 
   useEffect(() => {
     api.listEvents().then((e) => {
@@ -33,14 +44,28 @@ export default function EventsTable() {
     });
   }, []);
 
+  // Owner filter options: managed owners store + any legacy distinct ev.owner
+  // values not already in the list.
+  const ownerOptions = useMemo(() => {
+    const names = new Set(owners.map((o) => o.name));
+    for (const ev of events) {
+      const o = (ev.owner || '').trim();
+      if (o) names.add(o);
+    }
+    return [...names].sort((a, b) => a.localeCompare(b, 'he', { sensitivity: 'base' }));
+  }, [owners, events]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return events;
     return events.filter((ev) => {
-      const fields = [ev.title, ev.client_name, ev.audience];
-      return fields.some((f) => (f || '').toLowerCase().includes(q));
+      if (ownerFilter && (ev.owner || '') !== ownerFilter) return false;
+      if (q) {
+        const fields = [ev.title, ev.client_name, ev.audience];
+        if (!fields.some((f) => (f || '').toLowerCase().includes(q))) return false;
+      }
+      return true;
     });
-  }, [events, query]);
+  }, [events, query, ownerFilter]);
 
   // Toggle sorting: same key flips direction; a new key starts ascending.
   const toggleSort = (key) => {
@@ -72,6 +97,8 @@ export default function EventsTable() {
           return ev.title ? ev.title : null;
         case 'client_name':
           return ev.client_name ? ev.client_name : null;
+        case 'owner':
+          return ev.owner ? ev.owner : null;
         case 'when':
           return epoch(ev.target_date);
         case 'status':
@@ -84,7 +111,7 @@ export default function EventsTable() {
     };
 
     const dir = sortDir === 'asc' ? 1 : -1;
-    const isText = sortKey === 'title' || sortKey === 'client_name';
+    const isText = sortKey === 'title' || sortKey === 'client_name' || sortKey === 'owner';
 
     return [...filtered].sort((a, b) => {
       const av = valueOf(a);
@@ -130,13 +157,25 @@ export default function EventsTable() {
       <h1 className="text-2xl font-bold mb-6">סטטוס ימים</h1>
 
       {!loading && events.length > 0 && (
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="חיפוש לפי שם היום או הצוות…"
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 mb-6 focus:outline-none focus:border-ocar"
-        />
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="חיפוש לפי שם היום או הצוות…"
+            className="flex-1 border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-ocar"
+          />
+          <select
+            value={ownerFilter}
+            onChange={(e) => setOwnerFilter(e.target.value)}
+            className="border border-slate-300 rounded-lg px-3 py-2 sm:min-w-[12rem] focus:outline-none focus:border-ocar"
+          >
+            <option value="">כל האחראים</option>
+            {ownerOptions.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        </div>
       )}
 
       {loading ? (
@@ -156,6 +195,7 @@ export default function EventsTable() {
               <tr className="border-b border-slate-200 text-slate-500">
                 <SortHeader label="שם היום" sortKey="title" active={sortKey} dir={sortDir} onSort={toggleSort} />
                 <SortHeader label="לקוח" sortKey="client_name" active={sortKey} dir={sortDir} onSort={toggleSort} />
+                <SortHeader label="אחראי" sortKey="owner" active={sortKey} dir={sortDir} onSort={toggleSort} />
                 <SortHeader label="מתי" sortKey="when" active={sortKey} dir={sortDir} onSort={toggleSort} />
                 <SortHeader label="סטטוס" sortKey="status" active={sortKey} dir={sortDir} onSort={toggleSort} />
                 <th className="px-4 py-3 font-medium">מייל</th>
@@ -176,6 +216,7 @@ export default function EventsTable() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-slate-600">{ev.client_name || '—'}</td>
+                  <td className="px-4 py-3 text-slate-600">{ev.owner || '—'}</td>
                   <td className="px-4 py-3 text-slate-600">{whenLabel(ev) || '—'}</td>
                   <td className="px-4 py-3">
                     {isViewer ? (

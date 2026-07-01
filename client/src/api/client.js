@@ -87,6 +87,11 @@ export const api = {
   createClient: (name) => req('POST', '/api/clients', { name }),
   deleteClient: (id) => req('DELETE', `/api/clients/${id}`),
 
+  // owners (אחראי; defined list)
+  listOwners: () => req('GET', '/api/owners'),
+  createOwner: (name) => req('POST', '/api/owners', { name }),
+  deleteOwner: (id) => req('DELETE', `/api/owners/${id}`),
+
   // statuses (user-editable event statuses)
   listStatuses: () => req('GET', '/api/statuses'),
   createStatus: (label, color) => req('POST', '/api/statuses', { label, color }),
