@@ -370,6 +370,21 @@ function ClientsSection() {
   );
 }
 
+function OwnersSection() {
+  const { owners, loaded, load, addOwner, removeOwner } = useCatalogStore();
+  useEffect(() => { if (!loaded) load(); }, [loaded, load]);
+  return (
+    <ListManager
+      items={owners}
+      onAdd={addOwner}
+      onRemove={removeOwner}
+      placeholder="שם אחראי חדש"
+      emptyText="עוד אין אחראים."
+      confirmText={(n) => `למחוק את האחראי "${n}"?`}
+    />
+  );
+}
+
 export default function Settings() {
   return (
     <div dir="rtl" className="max-w-2xl">
@@ -393,6 +408,14 @@ export default function Settings() {
           הרשימה המוגדרת לבחירת לקוח בימים. אפשר להוסיף ולהסיר.
         </p>
         <ClientsSection />
+      </section>
+
+      <section className="mb-12">
+        <h2 className="text-xl font-bold mb-1">אחראי</h2>
+        <p className="text-slate-500 mb-4 text-sm">
+          הרשימה המוגדרת לבחירת אחראי בימים. אפשר להוסיף ולהסיר.
+        </p>
+        <OwnersSection />
       </section>
 
       <section className="mb-12">

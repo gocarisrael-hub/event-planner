@@ -6,16 +6,18 @@ export const useCatalogStore = create((set, get) => ({
   categories: [],
   spaces: [],
   clients: [],
+  owners: [],
   loaded: false,
 
   load: async () => {
-    const [catalog, categories, spaces, clients] = await Promise.all([
+    const [catalog, categories, spaces, clients, owners] = await Promise.all([
       api.listCatalog(),
       api.listCategories(),
       api.listSpaces(),
       api.listClients(),
+      api.listOwners(),
     ]);
-    set({ catalog, categories, spaces, clients, loaded: true });
+    set({ catalog, categories, spaces, clients, owners, loaded: true });
   },
 
   refresh: async () => {
@@ -74,5 +76,18 @@ export const useCatalogStore = create((set, get) => ({
   removeClient: async (id) => {
     await api.deleteClient(id);
     set({ clients: get().clients.filter((c) => c.id !== id) });
+  },
+
+  // Defined owner (אחראי) list.
+  addOwner: async (name) => {
+    const row = await api.createOwner(name);
+    if (!get().owners.some((o) => o.id === row.id)) {
+      set({ owners: [...get().owners, row] });
+    }
+    return row;
+  },
+  removeOwner: async (id) => {
+    await api.deleteOwner(id);
+    set({ owners: get().owners.filter((o) => o.id !== id) });
   },
 }));

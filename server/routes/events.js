@@ -60,6 +60,7 @@ router.post('/', (req, res) => {
   const event = events.insert({
     title: b.title || 'יום חדש',
     client_name: b.client_name || '',
+    owner: b.owner || '',
     group_size: b.group_size ?? null,
     audience: b.audience || '',
     requests: b.requests || '',

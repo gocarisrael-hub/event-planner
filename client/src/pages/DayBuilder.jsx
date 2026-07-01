@@ -8,6 +8,7 @@ import DatePicker from '../components/DatePicker.jsx';
 import TimelineItem from '../components/TimelineItem.jsx';
 import StatusSelect from '../components/StatusSelect.jsx';
 import ClientSelect from '../components/ClientSelect.jsx';
+import OwnerSelect from '../components/OwnerSelect.jsx';
 import { useCatalogStore } from '../store/useCatalogStore.js';
 import { useEventStore } from '../store/useEventStore.js';
 import { formatPrice, formatRange, MONTHS, SEASONS, timingLabel, total, whenLabel } from '../utils/format.js';
@@ -202,6 +203,7 @@ const DayDetailsEditor = forwardRef(function DayDetailsEditor({ event, onSave, o
   const [form, setForm] = useState({
     title: event.title || '',
     client_name: event.client_name || '',
+    owner: event.owner || '',
     group_size: event.group_size ?? '',
     audience: event.audience || '',
     requests: event.requests || '',
@@ -219,6 +221,7 @@ const DayDetailsEditor = forwardRef(function DayDetailsEditor({ event, onSave, o
       await onSave({
         title: form.title || `יום עבור ${form.client_name || 'לקוח'}`,
         client_name: form.client_name,
+        owner: form.owner,
         group_size: form.group_size ? Number(form.group_size) : null,
         audience: form.audience,
         requests: form.requests,
@@ -256,6 +259,10 @@ const DayDetailsEditor = forwardRef(function DayDetailsEditor({ event, onSave, o
         <label className="block">
           <span className="text-sm font-medium">לקוח</span>
           <ClientSelect className={field} value={form.client_name} onChange={(v) => set('client_name', v)} />
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium">אחראי</span>
+          <OwnerSelect className={field} value={form.owner} onChange={(v) => set('owner', v)} />
         </label>
         <label className="block">
           <span className="text-sm font-medium">גודל הקבוצה</span>
