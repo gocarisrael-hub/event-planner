@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { brand } from '../brand/brand.js';
-import { whenLabel } from '../utils/format.js';
+import { formatRange, profitTotal, whenLabel } from '../utils/format.js';
 import StatusSelect from '../components/StatusSelect.jsx';
 import { useStatusStore } from '../store/useStatusStore.js';
 import { useCatalogStore } from '../store/useCatalogStore.js';
@@ -105,6 +105,10 @@ export default function EventsTable() {
           return statusOrder(ev.status);
         case 'sent':
           return epoch(ev.emails?.[ev.emails.length - 1]?.date);
+        case 'profit': {
+          const p = profitTotal(ev.items, ev.budget, ev.group_size);
+          return p ? p.high : null;
+        }
         default:
           return null;
       }
@@ -200,6 +204,9 @@ export default function EventsTable() {
                 <SortHeader label="סטטוס" sortKey="status" active={sortKey} dir={sortDir} onSort={toggleSort} />
                 <th className="px-4 py-3 font-medium">מייל</th>
                 <SortHeader label="נשלח" sortKey="sent" active={sortKey} dir={sortDir} onSort={toggleSort} />
+                {!isViewer && (
+                  <SortHeader label="רווח" sortKey="profit" active={sortKey} dir={sortDir} onSort={toggleSort} />
+                )}
                 {!isViewer && <th className="px-4 py-3 font-medium" />}
               </tr>
             </thead>
@@ -251,6 +258,16 @@ export default function EventsTable() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{mailDate(ev)}</td>
+                  {!isViewer && (
+                    <td className="px-4 py-3 whitespace-nowrap font-medium">
+                      {(() => {
+                        const p = profitTotal(ev.items, ev.budget, ev.group_size);
+                        if (!p) return <span className="text-slate-400">—</span>;
+                        const cls = p.low >= 0 ? 'text-green-600' : p.high < 0 ? 'text-red-500' : 'text-amber-600';
+                        return <span className={cls}>{formatRange(p.low, p.high)}</span>;
+                      })()}
+                    </td>
+                  )}
                   {!isViewer && (
                     <td className="px-4 py-3 whitespace-nowrap">
                       <Link to={`/day/${ev.id}`} className="text-ocar font-medium hover:underline">
