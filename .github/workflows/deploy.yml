@@ -4,11 +4,6 @@ name: Deploy
 # human clicks "Run workflow" in the Actions tab. Keeps deploys in your hands.
 on:
   workflow_dispatch:
-    inputs:
-      confirm:
-        description: 'Type "deploy" to confirm a production deploy'
-        required: true
-        default: ''
 
 concurrency:
   # A new deploy cancels a stuck/in-progress one instead of queueing behind it.
@@ -17,7 +12,6 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ github.event.inputs.confirm == 'deploy' }}
     runs-on: ubuntu-latest
     # Don't let railway up hang forever (it can stall if Railway skips/dedupes).
     timeout-minutes: 15
