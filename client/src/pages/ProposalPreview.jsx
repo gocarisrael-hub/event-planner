@@ -16,23 +16,30 @@ export default function ProposalPreview() {
   // Build a filesystem-safe PDF filename from the event title, distinguishing
   // the with/without-prices variants. The a.download attribute below is what
   // actually names the saved blob.
-  const pdfFilename = (withPrices, withBudget) => {
+  // `option` is 'A' or 'B' when downloading a single option's proposal (mirrors
+  // the server, which inserts "אופציה א/ב" before the variant suffix).
+  const pdfFilename = (withPrices, withBudget, option = null) => {
     const base = String(event?.title ?? '')
       .replace(/[/\\:*?"<>|\x00-\x1f]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
     const suffix = withPrices ? ' (עם מחירים)' : withBudget ? '' : ' (ללא תקציב)';
-    return base ? `הצעה – ${base}${suffix}.pdf` : `הצעה${suffix}.pdf`;
+    const optionPart = option ? ` – אופציה ${option === 'B' ? 'ב' : 'א'}` : '';
+    return base
+      ? `הצעה – ${base}${optionPart}${suffix}.pdf`
+      : `הצעה${optionPart}${suffix}.pdf`;
   };
 
   // Download the server-rendered PDF (clean A4 Hebrew) instead of printing.
   // Three variants: with prices / no prices (with budget) / no prices, no budget.
-  const downloadPdf = async (withPrices, withBudget = true) => {
+  // When `option` ('A'/'B') is passed, downloads only that option's proposal.
+  const downloadPdf = async (withPrices, withBudget = true, option = null) => {
     setError('');
     setPending(true);
     try {
+      const optionQuery = option ? `&option=${option}` : '';
       const res = await fetch(
-        `/api/events/${id}/proposal.pdf?prices=${withPrices}&budget=${withBudget}`,
+        `/api/events/${id}/proposal.pdf?prices=${withPrices}&budget=${withBudget}${optionQuery}`,
         { headers: authHeaders() },
       );
       if (!res.ok) throw new Error(`status ${res.status}`);
@@ -40,7 +47,7 @@ export default function ProposalPreview() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = pdfFilename(withPrices, withBudget);
+      a.download = pdfFilename(withPrices, withBudget, option);
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -84,15 +91,41 @@ export default function ProposalPreview() {
         <div className="flex items-center gap-2 mr-auto">
           {error && <span className="text-sm text-red-500">{error}</span>}
           {pending && <span className="text-sm text-slate-400">יוצר PDF…</span>}
-          <button onClick={() => downloadPdf(false, true)} disabled={pending} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
-            בלי מחירים
-          </button>
-          <button onClick={() => downloadPdf(false, false)} disabled={pending} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
-            בלי מחירים ובלי תקציב
-          </button>
-          <button onClick={() => downloadPdf(true, true)} disabled={pending} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
-            עם מחירים
-          </button>
+          {event.options_mode === true ? (
+            // A/B options mode: a separate labeled group per option, each
+            // downloading THAT option's PDF as a normal single-schedule proposal.
+            <div className="flex items-center gap-4">
+              {[
+                { option: 'A', label: 'אופציה א' },
+                { option: 'B', label: 'אופציה ב' },
+              ].map(({ option, label }) => (
+                <div key={option} className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-slate-500">{label}:</span>
+                  <button onClick={() => downloadPdf(false, true, option)} disabled={pending} className="bg-ocar text-white px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
+                    בלי מחירים
+                  </button>
+                  <button onClick={() => downloadPdf(false, false, option)} disabled={pending} className="border border-ocar text-ocar px-3 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
+                    בלי מחירים ובלי תקציב
+                  </button>
+                  <button onClick={() => downloadPdf(true, true, option)} disabled={pending} className="border border-ocar text-ocar px-3 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
+                    עם מחירים
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              <button onClick={() => downloadPdf(false, true)} disabled={pending} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
+                בלי מחירים
+              </button>
+              <button onClick={() => downloadPdf(false, false)} disabled={pending} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
+                בלי מחירים ובלי תקציב
+              </button>
+              <button onClick={() => downloadPdf(true, true)} disabled={pending} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
+                עם מחירים
+              </button>
+            </>
+          )}
         </div>
       </div>
 
