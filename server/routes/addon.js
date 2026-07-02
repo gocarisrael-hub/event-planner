@@ -1,7 +1,7 @@
 // API-key-protected endpoints for the Gmail Add-on. Mounted at /api/addon.
 // Every route requires header `X-Addon-Key` matching process.env.ADDON_API_KEY.
 import { Router } from 'express';
-import { events, items } from '../db.js';
+import { events, items, statuses } from '../db.js';
 import { generateProposalPdf } from '../pdf/generate.js';
 
 const router = Router();
@@ -133,7 +133,26 @@ router.get('/event-by-thread', (req, res) => {
     );
   const event = matches[0];
   if (!event) return res.json({ exists: false });
-  res.json({ exists: true, id: event.id, title: event.title || '' });
+  res.json({ exists: true, id: event.id, title: event.title || '', status: event.status });
+});
+
+// --- Statuses list (for the add-on status dropdown) -----------------------
+router.get('/statuses', (_req, res) => {
+  const list = statuses.all().slice();
+  const hasOrder = list.every((s) => typeof s.order === 'number');
+  if (hasOrder) list.sort((a, b) => a.order - b.order);
+  res.json(list.map((s) => ({ id: s.id, label: s.label })));
+});
+
+// --- Set a day's status ---------------------------------------------------
+router.post('/set-status', (req, res) => {
+  const b = req.body || {};
+  const status = b.status;
+  const event = events.find(b.event_id);
+  if (!event) return res.status(404).json({ error: 'not found' });
+  if (!status) return res.status(400).json({ error: 'missing status' });
+  events.update(event.id, { status, updated_at: now() });
+  res.json({ ok: true, status });
 });
 
 // --- Proposal PDF (no prices) for an event --------------------------------

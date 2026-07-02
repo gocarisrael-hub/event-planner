@@ -151,6 +151,25 @@ function onGmailMessage(e) {
             .setOnClose(CardService.OnClose.NOTHING)
         )
     );
+    // Status dropdown: change the day's status straight from the panel. The
+    // current status (if known) is preselected; onChange POSTs set-status.
+    var statuses = fetchStatuses_(conf);
+    if (statuses && statuses.length) {
+      var statusDropdown = CardService.newSelectionInput()
+        .setType(CardService.SelectionInputType.DROPDOWN)
+        .setTitle('סטטוס')
+        .setFieldName('newStatus')
+        .setOnChangeAction(
+          CardService.newAction()
+            .setFunctionName('setDayStatus')
+            .setParameters({ eventId: String(existingDay.id) })
+        );
+      for (var s = 0; s < statuses.length; s++) {
+        var st = statuses[s];
+        statusDropdown.addItem(st.label, st.id, st.id === existingDay.status);
+      }
+      banner.addWidget(statusDropdown);
+    }
     // Insert the banner as the first section, before the info section.
     var bannerBuilder = CardService.newCardBuilder().setHeader(
       CardService.newCardHeader()
@@ -286,6 +305,42 @@ function fetchDays_(conf) {
     if (resp.getResponseCode() !== 200) return [];
     var data = JSON.parse(resp.getContentText());
     return Array.isArray(data) ? data : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+/**
+ * Fetches the user-managed statuses list from the backend, mirroring
+ * fetchEventByThread_'s caching so the panel stays fast. Returns an array of
+ * { id, label } or [] on any failure.
+ */
+var STATUSES_CACHE_TTL = 300; // seconds
+var STATUSES_CACHE_KEY = 'addon_statuses';
+
+function fetchStatuses_(conf) {
+  if (!conf || !conf.ok) return [];
+  var cache = null;
+  try { cache = CacheService.getUserCache(); } catch (err) { cache = null; }
+  if (cache) {
+    var hit = cache.get(STATUSES_CACHE_KEY);
+    if (hit) {
+      try { return JSON.parse(hit); } catch (err) { /* fall through to fetch */ }
+    }
+  }
+  try {
+    var resp = UrlFetchApp.fetch(conf.backendUrl + '/api/addon/statuses', {
+      method: 'get',
+      headers: { 'X-Addon-Key': conf.apiKey },
+      muteHttpExceptions: true
+    });
+    if (resp.getResponseCode() !== 200) return [];
+    var data = JSON.parse(resp.getContentText());
+    var list = Array.isArray(data) ? data : [];
+    if (cache) {
+      try { cache.put(STATUSES_CACHE_KEY, JSON.stringify(list), STATUSES_CACHE_TTL); } catch (err) { /* best-effort */ }
+    }
+    return list;
   } catch (err) {
     return [];
   }
@@ -471,6 +526,58 @@ function linkDay(e) {
       CardService.newNotification().setText('המייל קושר ליום')
     )
     .setNavigation(CardService.newNavigation().pushCard(card))
+    .build();
+}
+
+/* ------------------------------------------------------------------ */
+/* Action: change a day's status from the panel                       */
+/* ------------------------------------------------------------------ */
+
+function setDayStatus(e) {
+  var conf = cfg_();
+  if (!conf.ok) {
+    return notify_('חסרה הגדרת BACKEND_URL / ADDON_API_KEY');
+  }
+
+  var eventId = (e.parameters && e.parameters.eventId) || '';
+  if (!eventId) {
+    return notify_('לא נמצא מזהה יום.');
+  }
+
+  // Read the newly selected status from the dropdown form input, using the
+  // same access pattern as linkDay.
+  var newStatus = '';
+  try {
+    newStatus = e.commonEventObject.formInputs.newStatus.stringInputs.value[0];
+  } catch (err) {
+    newStatus = (e.formInput && e.formInput.newStatus) || '';
+  }
+  if (!newStatus) {
+    return notify_('בחר/י סטטוס');
+  }
+
+  var payload = { event_id: eventId, status: newStatus };
+
+  var resp;
+  try {
+    resp = UrlFetchApp.fetch(conf.backendUrl + '/api/addon/set-status', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'X-Addon-Key': conf.apiKey },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+  } catch (err) {
+    return notify_('שגיאת רשת בעדכון הסטטוס: ' + err);
+  }
+
+  var code = resp.getResponseCode();
+  if (code !== 200 && code !== 201) {
+    return notify_('עדכון הסטטוס נכשל (קוד ' + code + '). ' + shortBody_(resp));
+  }
+
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('הסטטוס עודכן'))
     .build();
 }
 
