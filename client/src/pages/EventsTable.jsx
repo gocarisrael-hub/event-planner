@@ -44,6 +44,20 @@ export default function EventsTable() {
     });
   }, []);
 
+  // Profit to show for a day. For a two-option day, compute each option's
+  // profit and show the LOWER (conservative) one — summing both options would
+  // wrongly subtract both plans' costs. Single-option → profit over all items.
+  const displayProfit = (ev) => {
+    if (ev.options_mode) {
+      const a = profitTotal((ev.items || []).filter((i) => i.option !== 'B'), ev.budget, ev.group_size);
+      const b = profitTotal((ev.items || []).filter((i) => i.option === 'B'), ev.budget, ev.group_size);
+      if (!a) return b;
+      if (!b) return a;
+      return a.high <= b.high ? a : b; // the lower-profit option
+    }
+    return profitTotal(ev.items, ev.budget, ev.group_size);
+  };
+
   // Owner filter options: managed owners store + any legacy distinct ev.owner
   // values not already in the list.
   const ownerOptions = useMemo(() => {
@@ -106,7 +120,7 @@ export default function EventsTable() {
         case 'sent':
           return epoch(ev.emails?.[ev.emails.length - 1]?.date);
         case 'profit': {
-          const p = profitTotal(ev.items, ev.budget, ev.group_size);
+          const p = displayProfit(ev);
           return p ? p.high : null;
         }
         default:
@@ -261,7 +275,7 @@ export default function EventsTable() {
                   {!isViewer && (
                     <td className="px-4 py-3 whitespace-nowrap font-medium">
                       {(() => {
-                        const p = profitTotal(ev.items, ev.budget, ev.group_size);
+                        const p = displayProfit(ev);
                         if (!p) return <span className="text-slate-400">—</span>;
                         const cls = p.low >= 0 ? 'text-green-600' : p.high < 0 ? 'text-red-500' : 'text-amber-600';
                         return <span className={cls}>{formatRange(p.low, p.high)}</span>;
