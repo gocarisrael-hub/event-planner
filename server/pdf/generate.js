@@ -36,17 +36,34 @@ function collectPhotoPaths(event) {
 // from disk, downscaled to MAX_WIDTH (only if larger), re-encoded as JPEG and
 // base64-embedded. Missing/unreadable files are skipped. This replaces the old
 // full-size synchronous embedding and shrinks the PDF dramatically.
+const MIME_BY_EXT = {
+  '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif',
+  '.svg': 'image/svg+xml', '.avif': 'image/avif', '.bmp': 'image/bmp',
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+};
+
 async function buildPhotoMap(event) {
   const map = {};
   await Promise.all(
     collectPhotoPaths(event).map(async (src) => {
+      const file = join(UPLOAD_DIR, basename(src));
       try {
-        const img = await Jimp.read(join(UPLOAD_DIR, basename(src)));
+        const img = await Jimp.read(file);
         if (img.width > MAX_WIDTH) img.resize({ w: MAX_WIDTH });
         const buf = await img.getBuffer('image/jpeg', { quality: JPEG_QUALITY });
         map[src] = `data:image/jpeg;base64,${buf.toString('base64')}`;
       } catch {
-        // Missing or unreadable — omit it; the template drops the <img>.
+        // Jimp can't decode some formats (notably WebP). Rather than silently
+        // drop the image, embed the original bytes so Chromium — which renders
+        // those formats — still shows it (just not downscaled).
+        try {
+          const raw = await readFile(file);
+          const mime = MIME_BY_EXT[extname(file).toLowerCase()] || 'image/jpeg';
+          map[src] = `data:${mime};base64,${raw.toString('base64')}`;
+        } catch (err) {
+          // Truly missing/unreadable — omit it and say so in the logs.
+          console.warn(`PDF: dropping image "${src}" — ${err.message}`);
+        }
       }
     }),
   );
