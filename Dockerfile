@@ -7,7 +7,8 @@
 FROM node:22-bookworm-slim
 
 ENV NODE_ENV=production \
-    PUPPETEER_CACHE_DIR=/root/.cache/puppeteer
+    PUPPETEER_CACHE_DIR=/root/.cache/puppeteer \
+    PUPPETEER_SKIP_DOWNLOAD=true
 
 # Chrome runtime libraries + fonts. We install the `chromium` package purely to
 # pull in the full set of shared libraries Chrome needs (we don't run this binary
@@ -16,6 +17,7 @@ ENV NODE_ENV=production \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     ca-certificates \
+    unzip \
     fonts-freefont-ttf \
     fonts-noto-core \
     fonts-liberation \
@@ -43,8 +45,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY client/package.json ./client/
 COPY server/package.json ./server/
-RUN npm install --include=dev \
- && npx puppeteer browsers install chrome
+RUN npm install --include=dev
+
+# Download Puppeteer's version-matched Chrome as its own step (needs `unzip`,
+# installed above, to extract the archive) into PUPPETEER_CACHE_DIR.
+RUN npx puppeteer browsers install chrome
 
 # Copy the rest of the repo and build the client.
 COPY . .
