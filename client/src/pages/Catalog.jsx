@@ -122,10 +122,47 @@ function CatalogFiles({ item, onChanged }) {
     </div>
   );
 }
+// Files staged locally in the "add" form. Real attachments upload to a
+// per-id endpoint, so a not-yet-created activity can only hold File objects
+// in memory here; save() uploads them the moment the row (and its id) exist.
+function DraftFiles({ files, onChange }) {
+  const inputRef = useRef(null);
+  const onPick = (e) => {
+    const chosen = Array.from(e.target.files || []);
+    if (chosen.length) onChange([...files, ...chosen]);
+    if (inputRef.current) inputRef.current.value = '';
+  };
+  const remove = (i) => onChange(files.filter((_, idx) => idx !== i));
+  return (
+    <div className="border-t border-slate-100 pt-2">
+      <div className="text-xs text-slate-400 mb-1">קבצים — יצורפו לפעילות עם השמירה</div>
+      <input ref={inputRef} type="file" multiple className="hidden" onChange={onPick} />
+      <button type="button" onClick={() => inputRef.current?.click()}
+        className="text-ocar text-sm font-medium hover:underline">
+        + הוסף קובץ
+      </button>
+      {files.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {files.map((f, i) => (
+            <li key={i} className="flex items-center gap-2 border border-slate-100 rounded-lg px-2 py-1">
+              <span className="flex-shrink-0">{fileIcon(f)}</span>
+              <div className="flex-1 min-w-0">
+                <div className="truncate text-sm text-slate-700" title={f.name}>{f.name}</div>
+                <div className="text-xs text-slate-400">{fileSize(f.size)}</div>
+              </div>
+              <button type="button" onClick={() => remove(i)}
+                className="flex-shrink-0 text-slate-400 hover:text-red-600" title="הסר">✕</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 const blank = {
   title: '', description: '', notes: '', category: '',
   default_duration_hours: '', default_price: '', default_price_type: 'per_person',
-  contact_name: '', contact_phone: '', location: '', photos: [],
+  contact_name: '', contact_phone: '', location: '', photos: [], files: [],
 };
 
 export default function Catalog() {
@@ -145,13 +182,24 @@ export default function Catalog() {
     default_price: d.default_price ? Number(d.default_price) : null,
   });
 
+  const [saving, setSaving] = useState(false);
+
   const save = async () => {
-    if (!draft.title.trim()) return;
-    const row = await addCatalog(numify(draft));
-    setDraft(blank);
-    // Open the just-created activity in its full inline editor so files, notes
-    // and all options are immediately available (they're edit-only).
-    if (row && row.id) setEditing(row.id);
+    if (!draft.title.trim() || saving) return;
+    setSaving(true);
+    try {
+      // `files` are staged File objects held only in the form — the upload
+      // endpoint is per-id, so they can only be sent once the row exists.
+      const { files, ...fields } = draft;
+      const row = await addCatalog(numify(fields));
+      if (row && row.id && files.length) {
+        for (const f of files) await api.addCatalogFile(row.id, f);
+        await refresh(); // pull the row back with its saved file metadata
+      }
+      setDraft(blank); // reset + close the add form — the new activity is in the list
+    } finally {
+      setSaving(false);
+    }
   };
 
   const locations = useMemo(
@@ -212,8 +260,10 @@ export default function Catalog() {
         </div>
         <SpaceSelect value={draft.location} onChange={(location) => setDraft({ ...draft, location })} />
         <PhotoUploader photos={draft.photos} onChange={(photos) => setDraft({ ...draft, photos })} small />
-        <button onClick={save} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90">
-          + הוסף לקטלוג
+        <DraftFiles files={draft.files} onChange={(files) => setDraft({ ...draft, files })} />
+        <button onClick={save} disabled={saving}
+          className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60">
+          {saving ? 'שומר…' : '+ הוסף לקטלוג'}
         </button>
       </div>
 

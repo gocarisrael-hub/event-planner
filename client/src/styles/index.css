@@ -10,6 +10,21 @@ body {
   @apply bg-slate-50 text-slate-800 font-sans;
 }
 
+/* Hebrew UI: keep the caret and text on the RIGHT for every text field. Some
+   inputs otherwise land in an LTR context and the cursor jumps to the left
+   edge. Checkboxes/radios/files/buttons are excluded so they're unaffected. */
+@layer base {
+  input:where(
+      [type='text'], [type='search'], [type='number'], [type='tel'],
+      [type='email'], [type='url'], [type='password'], :not([type])
+    ),
+  textarea,
+  select {
+    direction: rtl;
+    text-align: right;
+  }
+}
+
 /* ---- Print: the proposal page becomes a clean A4 document ---- */
 @media print {
   @page {

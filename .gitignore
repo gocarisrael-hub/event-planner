@@ -21,3 +21,4 @@ server/data/gmail-token.json
 **/credentials*.json
 !**/credentials.example.json
 assets/credentials.json.json
+addon/.clasp.json

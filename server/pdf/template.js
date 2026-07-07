@@ -447,7 +447,7 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover, optio
   // The warm closing CTA + contact — always present, paired with the band.
   const ctaHtml = `
     <div class="cta">
-      <span class="cta-line">נשמח לתאם ולצאת לדרך 🎉</span>
+      <span class="cta-line">נשמח לעמוד לרשותכם ולצאת יחד לדרך</span>
       <span class="meta-dot">·</span>
       <span class="cta-contact"><span class="cta-brand">${esc(BRAND.name)}</span> <bdi>${esc(BRAND.contact)}</bdi></span>
     </div>`;
