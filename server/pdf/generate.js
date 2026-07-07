@@ -207,20 +207,15 @@ async function getBrowser() {
   browserPromise = puppeteer
     .launch({
       headless: true,
+      // Use Puppeteer's bundled Chrome (env unset → undefined). The Debian
+      // system Chromium would not launch in this container; the bundled build
+      // does. Standard headless-in-container flags: --no-sandbox (no user
+      // namespaces available), --disable-dev-shm-usage (route shared memory to
+      // /tmp instead of the tiny /dev/shm), --disable-gpu (no GPU/display).
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      // Container-safe flags. Railway's container kills a normal multi-process
-      // Chromium at launch ("Failed to launch … Code: null") — its sandbox is
-      // restricted and memory is tight. --single-process + --no-zygote collapse
-      // Chromium into ONE process, which avoids the blocked zygote fork and
-      // slashes the launch memory footprint (the actual fix here). The rest are
-      // standard headless-in-container hygiene: --no-sandbox (no user ns),
-      // --disable-dev-shm-usage (route shared memory to /tmp, not the tiny
-      // /dev/shm), --disable-gpu (no GPU/display in the container).
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--no-zygote',
-        '--single-process',
         '--disable-dev-shm-usage',
         '--disable-gpu',
       ],

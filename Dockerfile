@@ -1,15 +1,18 @@
 # Event Planner — production image for Railway.
-# Uses the system Chromium (not Puppeteer's bundled download) plus Hebrew-capable
-# fonts so the Hebrew proposal PDFs render correctly.
+# Uses Puppeteer's OWN bundled Chrome (downloaded at build time) rather than the
+# Debian system Chromium, which would not launch in this container (killed at
+# startup: "Failed to launch the browser process: Code: null"). The apt packages
+# below provide Chrome's shared-library dependencies plus Hebrew-capable fonts so
+# the Hebrew proposal PDFs render correctly.
 FROM node:22-bookworm-slim
 
 ENV NODE_ENV=production \
-    PUPPETEER_SKIP_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    PUPPETEER_CACHE_DIR=/root/.cache/puppeteer
 
-# Chromium + its runtime libraries, and fonts.
-# fonts-freefont-ttf provides Hebrew glyphs (FreeSans/FreeSerif cover Hebrew);
-# fonts-noto-core adds broad Unicode coverage. Together they render Hebrew text.
+# Chrome runtime libraries + fonts. We install the `chromium` package purely to
+# pull in the full set of shared libraries Chrome needs (we don't run this binary
+# — Puppeteer runs its own bundled Chrome). fonts-freefont-ttf provides Hebrew
+# glyphs (FreeSans/FreeSerif); fonts-noto-core adds broad Unicode coverage.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     ca-certificates \
@@ -40,7 +43,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY client/package.json ./client/
 COPY server/package.json ./server/
-RUN npm install --include=dev
+RUN npm install --include=dev \
+ && npx puppeteer browsers install chrome
 
 # Copy the rest of the repo and build the client.
 COPY . .
