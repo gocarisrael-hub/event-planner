@@ -191,18 +191,47 @@ async function getBrowser() {
     throw new Error(`PDF generation unavailable: puppeteer not installed (${err.message})`);
   }
 
-  if (!browserPromise) {
-    browserPromise = puppeteer
-      .launch({
-        headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      })
-      .catch((err) => {
-        browserPromise = null; // allow a retry on next call
-        throw new Error(`PDF generation unavailable: could not launch headless Chromium (${err.message})`);
-      });
+  // Reuse a healthy instance, but drop a crashed/disconnected one so a single
+  // Chromium crash (e.g. an OOM on a memory-tight host) doesn't wedge EVERY
+  // subsequent PDF until the server restarts.
+  if (browserPromise) {
+    try {
+      const existing = await browserPromise;
+      if (existing.connected) return existing;
+    } catch {
+      // A prior launch rejected; fall through and relaunch.
+    }
+    browserPromise = null;
   }
+
+  browserPromise = puppeteer
+    .launch({
+      headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      // Container-safe flags. `--disable-dev-shm-usage` is the important one:
+      // Railway's container gives Chromium a tiny /dev/shm, so without it the
+      // browser process is killed on launch ("Failed to launch … Code: null").
+      // It routes shared memory to /tmp instead. --disable-gpu drops the unused
+      // GPU stack (no display in the container).
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
+    })
+    .then((browser) => {
+      // If Chromium dies later (crash/OOM/idle-kill), clear the cache so the
+      // next call relaunches instead of handing out a dead browser.
+      browser.on('disconnected', () => {
+        browserPromise = null;
+      });
+      return browser;
+    })
+    .catch((err) => {
+      browserPromise = null; // allow a retry on next call
+      throw new Error(`PDF generation unavailable: could not launch headless Chromium (${err.message})`);
+    });
   return browserPromise;
 }
 

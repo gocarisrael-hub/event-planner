@@ -42,7 +42,16 @@ export default function ProposalPreview() {
         `/api/events/${id}/proposal.pdf?prices=${withPrices}&budget=${withBudget}${optionQuery}`,
         { headers: authHeaders() },
       );
-      if (!res.ok) throw new Error(`status ${res.status}`);
+      if (!res.ok) {
+        // The server returns { error, message } with the real reason (e.g. a
+        // Chromium launch/crash) — surface it instead of a generic failure.
+        let detail = `status ${res.status}`;
+        try {
+          const body = await res.json();
+          if (body?.message) detail = body.message;
+        } catch { /* non-JSON body — keep the status code */ }
+        throw new Error(detail);
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -52,8 +61,8 @@ export default function ProposalPreview() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-    } catch {
-      setError('יצירת ה-PDF נכשלה');
+    } catch (e) {
+      setError(`יצירת ה-PDF נכשלה — ${e.message}`);
     } finally {
       setPending(false);
     }
