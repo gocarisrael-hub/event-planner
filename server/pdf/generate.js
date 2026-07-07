@@ -208,14 +208,19 @@ async function getBrowser() {
     .launch({
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      // Container-safe flags. `--disable-dev-shm-usage` is the important one:
-      // Railway's container gives Chromium a tiny /dev/shm, so without it the
-      // browser process is killed on launch ("Failed to launch … Code: null").
-      // It routes shared memory to /tmp instead. --disable-gpu drops the unused
-      // GPU stack (no display in the container).
+      // Container-safe flags. Railway's container kills a normal multi-process
+      // Chromium at launch ("Failed to launch … Code: null") — its sandbox is
+      // restricted and memory is tight. --single-process + --no-zygote collapse
+      // Chromium into ONE process, which avoids the blocked zygote fork and
+      // slashes the launch memory footprint (the actual fix here). The rest are
+      // standard headless-in-container hygiene: --no-sandbox (no user ns),
+      // --disable-dev-shm-usage (route shared memory to /tmp, not the tiny
+      // /dev/shm), --disable-gpu (no GPU/display in the container).
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
+        '--no-zygote',
+        '--single-process',
         '--disable-dev-shm-usage',
         '--disable-gpu',
       ],
