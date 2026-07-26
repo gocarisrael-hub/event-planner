@@ -176,6 +176,125 @@ test('mixed types: flat total + per_person sum correctly per group and per head'
   assert.ok(html.includes('₪150'), 'expected per-person ₪150');
 });
 
+test('fixed_cost is added ONCE to the group total, not per head', () => {
+  // ₪50/head × 10 = ₪500, plus a flat ₪800 → group ₪1300, per head ₪130.
+  const html = proposalHtml(
+    {
+      title: 'יום',
+      group_size: 10,
+      items: [{ title: 'סדנה', price: 50, price_type: 'per_person', fixed_cost: 800 }],
+    },
+    { prices: true, photos: {}, logo: null },
+  );
+  assert.ok(html.includes('₪1300'), 'expected group total ₪1300 (50×10 + 800)');
+  assert.ok(html.includes('₪130'), 'expected per-person ₪130');
+  assert.ok(!html.includes('₪8000'), 'fixed cost must not be multiplied by the group');
+});
+
+test('fixed_cost is itemised with its note when prices are on', () => {
+  const html = proposalHtml(
+    {
+      title: 'יום',
+      group_size: 10,
+      items: [{ title: 'סדנה', price: 50, fixed_cost: 800, fixed_cost_note: 'שכירות מקום' }],
+    },
+    { prices: true, photos: {}, logo: null },
+  );
+  assert.ok(html.includes('₪800'), 'expected the flat extra amount');
+  assert.ok(html.includes('שכירות מקום'), 'expected the note saying what it covers');
+  assert.ok(html.includes('class="act-fixed"'), 'expected the flat-extra line');
+});
+
+test('fixed_cost is hidden (but still counted) when prices are off', () => {
+  const html = proposalHtml(
+    {
+      title: 'יום',
+      group_size: 10,
+      items: [{ title: 'סדנה', price: 50, fixed_cost: 800, fixed_cost_note: 'מדריך' }],
+    },
+    { prices: false, photos: {}, logo: null },
+  );
+  assert.ok(!html.includes('₪800'), 'no amount in the no-prices variant');
+  assert.ok(!html.includes('מדריך'), 'no note in the no-prices variant');
+});
+
+test('a blank/zero/invalid fixed_cost renders nothing and changes no total', () => {
+  for (const fixed_cost of [undefined, null, 0, -5, '', 'abc']) {
+    const html = proposalHtml(
+      {
+        title: 'יום',
+        group_size: 10,
+        items: [{ title: 'סדנה', price: 50, fixed_cost }],
+      },
+      { prices: true, photos: {}, logo: null },
+    );
+    assert.ok(!html.includes('class="act-fixed"'), `no flat-extra line for ${fixed_cost}`);
+    assert.ok(html.includes('₪500'), `group total stays ₪500 for ${fixed_cost}`);
+  }
+});
+
+test('an item priced ONLY by a fixed cost still shows the totals band', () => {
+  const html = proposalHtml(
+    {
+      title: 'יום',
+      group_size: 10,
+      items: [{ title: 'אולם', fixed_cost: 800, fixed_cost_note: 'שכירות' }],
+    },
+    { prices: true, photos: {}, logo: null },
+  );
+  assert.ok(html.includes('מחיר לאדם'), 'totals band must render');
+  assert.ok(html.includes('₪800'), 'expected the group total ₪800');
+  assert.ok(html.includes('₪80'), 'expected per-person ₪80 (800/10)');
+});
+
+test('fixed_cost_note is HTML-escaped', () => {
+  const html = proposalHtml(
+    { title: 'א', items: [{ title: 'x', fixed_cost: 10, fixed_cost_note: '<b>&"' }] },
+    { prices: true, photos: {}, logo: null },
+  );
+  assert.ok(html.includes('&lt;b&gt;&amp;&quot;'), 'expected escaped note');
+  assert.ok(!html.includes('<b>&"'), 'raw unescaped value must not appear');
+});
+
+test('client_notes render in the proposal, in every variant', () => {
+  for (const prices of [true, false]) {
+    const html = proposalHtml(
+      { title: 'א', client_notes: 'המחירים אינם כוללים מע״מ', items: [] },
+      { prices, photos: {}, logo: null },
+    );
+    assert.ok(html.includes('המחירים אינם כוללים מע״מ'), `notes must render (prices=${prices})`);
+    assert.ok(html.includes('class="notes"'), `notes block must render (prices=${prices})`);
+  }
+});
+
+test('client_notes block is omitted when blank or whitespace-only', () => {
+  for (const client_notes of [undefined, null, '', '   \n  ']) {
+    const html = proposalHtml(
+      { title: 'א', client_notes, items: [] },
+      { prices: false, photos: {}, logo: null },
+    );
+    assert.ok(!html.includes('class="notes"'), `no notes block for ${JSON.stringify(client_notes)}`);
+  }
+});
+
+test('client_notes are HTML-escaped', () => {
+  const html = proposalHtml(
+    { title: 'א', client_notes: '<script>x</script>&"', items: [] },
+    { prices: false, photos: {}, logo: null },
+  );
+  assert.ok(!html.includes('<script>'), 'raw script tag must not appear');
+  assert.ok(html.includes('&lt;script&gt;'), 'expected escaped notes');
+});
+
+test('private event notes never appear in the PDF', () => {
+  const html = proposalHtml(
+    { title: 'א', notes: 'הערה פנימית סודית', client_notes: 'גלוי', items: [] },
+    { prices: false, photos: {}, logo: null },
+  );
+  assert.ok(!html.includes('הערה פנימית סודית'), 'internal notes must not render');
+  assert.ok(html.includes('גלוי'), 'client notes still render');
+});
+
 test('requests text never appears in the PDF', () => {
   const html = proposalHtml(
     { title: 'א', requests: 'אנחנו רוצים משהו מיוחד', items: [] },

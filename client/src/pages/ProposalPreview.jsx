@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, authHeaders } from '../api/client.js';
 import { brand } from '../brand/brand.js';
-import { formatDuration, formatPrice, formatRange, groupTotal, perPerson, priceRange, sortByStart, timingLabel, total, whenLabel } from '../utils/format.js';
+import { fixedCost, formatDuration, formatPrice, formatRange, groupTotal, hasPricing, perPerson, priceRange, sortByStart, timingLabel, whenLabel } from '../utils/format.js';
 
 export default function ProposalPreview() {
   const { id } = useParams();
@@ -72,7 +72,7 @@ export default function ProposalPreview() {
 
   const items = sortByStart(event.items || []);
   const groupSize = event.group_size > 0 ? event.group_size : 0;
-  const { high } = total(items); // whether anything is priced (gates the band)
+  const priced = hasPricing(items); // gates the totals band (incl. flat extras)
   const pp = perPerson(items, groupSize);
   const g = groupTotal(items, groupSize);
 
@@ -209,17 +209,35 @@ export default function ProposalPreview() {
                           <span className="mr-2 font-normal text-slate-400">· {formatDuration(it.approx_duration_hours)}</span>
                         ) : null}
                       </div>
-                      {showPrices && !it.options?.length && formatPrice(it.price) && (
-                        <div className="text-sm font-semibold whitespace-nowrap">
-                          {formatPrice(it.price)}
-                          {it.price_type === 'total' && (
-                            <span className="mr-1 text-xs font-normal text-slate-400">סה״כ</span>
-                          )}
-                        </div>
-                      )}
-                      {showPrices && it.options?.length > 0 && (() => {
-                        const { low: lo, high: hi } = priceRange(it);
-                        return <div className="text-sm font-semibold whitespace-nowrap">{formatRange(lo, hi)}</div>;
+                      {showPrices && (() => {
+                        // Per-head price (or the option range), then any flat
+                        // extra itemised beneath it with what it covers.
+                        const fc = fixedCost(it);
+                        const hasOpts = it.options?.length > 0;
+                        const head = hasOpts
+                          ? formatRange(priceRange(it).low, priceRange(it).high)
+                          : formatPrice(it.price);
+                        if (!head && fc <= 0) return null;
+                        return (
+                          <div className="text-left whitespace-nowrap">
+                            {head && (
+                              <div className="text-sm font-semibold">
+                                {head}
+                                {!hasOpts && it.price_type === 'total' && (
+                                  <span className="mr-1 text-xs font-normal text-slate-400">סה״כ</span>
+                                )}
+                              </div>
+                            )}
+                            {fc > 0 && (
+                              <div className="text-xs font-semibold text-slate-600">
+                                + {formatPrice(fc)}
+                                <span className="mr-1 font-normal text-slate-400">
+                                  סה״כ{it.fixed_cost_note ? ` · ${it.fixed_cost_note}` : ''}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
                       })()}
                     </div>
 
@@ -267,9 +285,22 @@ export default function ProposalPreview() {
             ))}
           </div>
 
+          {/* Client-facing notes — shown to the client, unlike event.notes.
+              whitespace-pre-line keeps the planner's own line breaks. */}
+          {String(event.client_notes || '').trim() && (
+            <div className="mt-8 rounded-xl border border-slate-200 p-4">
+              <div className="text-xs font-bold tracking-widest" style={{ color: brand.colors.primary }}>
+                הערות
+              </div>
+              <div className="mt-1 text-sm text-slate-600 whitespace-pre-line break-words">
+                {event.client_notes}
+              </div>
+            </div>
+          )}
+
           {/* Closing — investment per person + CTA */}
           <div className="mt-10 rounded-2xl p-6" style={{ background: brand.colors.soft }}>
-            {showPrices && high > 0 ? (
+            {showPrices && priced ? (
               <>
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-lg" style={{ color: brand.colors.dark }}>השקעה לאדם</span>

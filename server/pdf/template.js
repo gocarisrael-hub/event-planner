@@ -110,6 +110,19 @@ function total(items) {
   return { low, high };
 }
 
+// An item's optional extra FLAT cost, charged once for the whole group on top
+// of its per-head price (mirrors client/src/utils/format.js fixedCost).
+function fixedCost(item) {
+  const v = Number(item.fixed_cost);
+  return Number.isFinite(v) && v > 0 ? v : 0;
+}
+
+// Whether a schedule carries ANY money at all — a per-head price, an option
+// price, or a flat extra (mirrors client/src/utils/format.js hasPricing).
+function hasPricing(items) {
+  return items.some((it) => priceRange(it).high > 0 || fixedCost(it) > 0);
+}
+
 // Group total accounting for each item's price TYPE (mirrors
 // client/src/utils/format.js groupTotal): choice blocks and per_person items
 // contribute priceRange×N, while a plain price_type==='total' item contributes
@@ -128,6 +141,10 @@ function groupTotal(items, groupSize) {
       low += r.low * n;
       high += r.high * n;
     }
+    // A fixed extra is added ONCE, never × N.
+    const fc = fixedCost(it);
+    low += fc;
+    high += fc;
   }
   return { low, high };
 }
@@ -190,17 +207,31 @@ function itemHtml(it, { showPrices, photoMap }) {
     // Plain items show their single price.
     let slotPrice = '';
     if (showPrices) {
+      const money = [];
       if (hasOptions) {
         const { low: lo, high: hi } = priceRange(it);
-        slotPrice = `<div class="act-price"><bdi>${esc(formatRange(lo, hi))}</bdi></div>`;
+        money.push(`<div class="act-price"><bdi>${esc(formatRange(lo, hi))}</bdi></div>`);
       } else if (formatPrice(it.price)) {
         // A flat total-priced item (e.g. venue rental) is tagged סה״כ so it's
         // not mistaken for a per-head figure.
         const tag = it.price_type === 'total'
           ? ' <span class="price-tag">סה״כ</span>'
           : '';
-        slotPrice = `<div class="act-price"><bdi>${esc(formatPrice(it.price))}</bdi>${tag}</div>`;
+        money.push(`<div class="act-price"><bdi>${esc(formatPrice(it.price))}</bdi>${tag}</div>`);
       }
+      // The extra flat charge, itemised under the per-head price with the
+      // label saying what it covers (rental, guide…) so the client can see
+      // exactly what the group total is made of.
+      const fc = fixedCost(it);
+      if (fc > 0) {
+        const what = String(it.fixed_cost_note || '').trim();
+        const tag = what ? `סה״כ · ${what}` : 'סה״כ';
+        money.push(
+          `<div class="act-fixed">+ <bdi>${esc(formatPrice(fc))}</bdi>` +
+          `<span class="act-fixed-tag">${esc(tag)}</span></div>`,
+        );
+      }
+      if (money.length) slotPrice = `<div class="act-money">${money.join('')}</div>`;
     }
 
     const itemContact = [it.contact_name, it.contact_phone].filter(Boolean).join(' · ');
@@ -283,8 +314,7 @@ function totalsBand(items, groupSize, label = 'מחיר לאדם') {
 function scheduleSection(rawItems, { showPrices, photoMap, groupSize, totalsLabel }) {
   const items = sortByStart(rawItems);
   const itemsHtml = items.map((it) => itemHtml(it, { showPrices, photoMap })).join('');
-  const { high } = total(items);
-  const totalsHtml = showPrices && high > 0
+  const totalsHtml = showPrices && hasPricing(items)
     ? totalsBand(items, groupSize, totalsLabel)
     : '';
   return `<div class="items">${itemsHtml}</div>${totalsHtml}`;
@@ -404,6 +434,20 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover, optio
       ${scheduleSection(allItems, { showPrices, photoMap, groupSize })}`;
   }
 
+  // Client-facing notes ("הערות ללקוח") — free text the planner wants ON the
+  // proposal (what's included, what isn't, meeting point…). Distinct from
+  // event.notes, which stays internal and is never rendered. Shown in every
+  // variant, prices or not. Line breaks are preserved via CSS (pre-line), so
+  // the text only needs escaping.
+  const clientNotes = String(event.client_notes || '').trim();
+  const clientNotesHtml = clientNotes
+    ? `
+      <section class="notes">
+        <div class="notes-label">הערות</div>
+        <div class="notes-body">${esc(clientNotes)}</div>
+      </section>`
+    : '';
+
   // --- Closing: investment band + CTA, kept tidy and paired ---------------
   // With prices on, the closing band summarises the overall per-person + group
   // total (single mode only — options mode already shows a per-section total).
@@ -413,8 +457,7 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover, optio
   let closingBandHtml = '';
   if (showPrices) {
     if (!optionsMode) {
-      const { high } = total(allItems);
-      if (high > 0) {
+      if (hasPricing(allItems)) {
         const pp = perPerson(allItems, groupSize);
         const g = groupTotal(allItems, groupSize);
         closingBandHtml = `
@@ -621,6 +664,19 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover, optio
     font-size: 9.5px; font-weight: 600; color: var(--ink-4);
     letter-spacing: .04em; margin-inline-start: 3px;
   }
+  /* Money column: the per-head price and, under it, any flat extra. Sits at
+     the far (left, in RTL) edge of the card header. */
+  .act-money { flex-shrink: 0; text-align: end; }
+  /* The extra flat charge, e.g. "+ [amount] · שכירות מקום" — quieter than the
+     headline price so it reads as a supplement, not a competing figure. */
+  .act-fixed {
+    font-size: 11px; font-weight: 700; color: var(--ink-2);
+    font-variant-numeric: tabular-nums; white-space: nowrap; margin-top: 2px;
+  }
+  .act-fixed-tag {
+    font-size: 9.5px; font-weight: 600; color: var(--ink-4);
+    letter-spacing: .04em; margin-inline-start: 4px;
+  }
   /* TIME — scannable: red marker + bold tabular time + muted duration. */
   .act-time {
     display: inline-flex; align-items: center; gap: 8px; margin-top: 4px;
@@ -697,6 +753,25 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover, optio
   }
 
   /* ====================================================================
+     CLIENT NOTES — free-text block between the schedule and the closing.
+     Flat card + hairline border (print-safe); white-space:pre-line keeps the
+     planner's own line breaks without needing <br> in the markup. */
+  .notes {
+    margin-top: 22px; padding: 11px 14px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .notes-label {
+    font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--brand); margin-bottom: 5px;
+    break-after: avoid; page-break-after: avoid;
+  }
+  .notes-body {
+    font-size: 11.5px; line-height: 1.5; color: var(--ink-2);
+    white-space: pre-line; word-break: break-word;
+  }
+
+  /* ====================================================================
      CLOSING — investment band + CTA. Open editorial block: a strong red top
      rule + dark label + a big red value reads premium and prints perfectly
      clean (no filled box, no shadow). The .invest band keeps break-inside
@@ -739,6 +814,8 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover, optio
     ${coverHtml}
 
     ${bodyHtml}
+
+    ${clientNotesHtml}
 
     ${closingHtml}
   </div>

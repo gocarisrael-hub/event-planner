@@ -190,7 +190,15 @@ export default function TimelineItem({ item, onChange, onRemove, onClose }) {
                 <select
                   className={`${field} mt-1`}
                   value={item.price_type === 'total' ? 'total' : 'per_person'}
-                  onChange={(e) => set({ price_type: e.target.value })}
+                  onChange={(e) => {
+                    // Switching to a flat total makes the "extra fixed cost"
+                    // meaningless (the whole price is already flat) — clear it
+                    // so a hidden field can't keep inflating the group total.
+                    const price_type = e.target.value;
+                    set(price_type === 'total'
+                      ? { price_type, fixed_cost: null, fixed_cost_note: '' }
+                      : { price_type });
+                  }}
                 >
                   <option value="per_person">לאדם</option>
                   <option value="total">סה״כ (לכל הקבוצה)</option>
@@ -198,6 +206,37 @@ export default function TimelineItem({ item, onChange, onRemove, onClose }) {
               )}
             </label>
           </div>
+
+          {/* Extra flat cost on top of a PER-PERSON price — e.g. venue rental
+              or a guide's fee that's charged once for the whole group. Only
+              offered for a plain per-person item; a choice block or an already
+              flat price has nothing to add it to. */}
+          {!hasOptions && item.price_type !== 'total' && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <label className="text-xs text-slate-500">
+                תוספת קבועה (₪)
+                <input
+                  type="number"
+                  className={field}
+                  value={item.fixed_cost ?? ''}
+                  placeholder="למשל 800"
+                  onChange={(e) => set({ fixed_cost: e.target.value ? Number(e.target.value) : null })}
+                />
+              </label>
+              <label className="text-xs text-slate-500 col-span-2">
+                על מה התוספת?
+                <input
+                  className={field}
+                  value={item.fixed_cost_note || ''}
+                  placeholder="למשל: שכירות מקום, מדריך"
+                  onChange={(e) => set({ fixed_cost_note: e.target.value })}
+                />
+              </label>
+              <div className="col-span-2 sm:col-span-3 text-xs text-slate-400">
+                מחושב פעם אחת לכל הקבוצה (לא כפול מספר המשתתפים), ומופיע בהצעה עם המחירים.
+              </div>
+            </div>
+          )}
 
           <div>
             <div className="text-xs text-slate-500 mb-1">תמונות</div>

@@ -347,6 +347,12 @@ export default function DayBuilder() {
   const [notesStatus, setNotesStatus] = useState(''); // '', 'saving', 'saved'
   const notesTimer = useRef(null);
 
+  // Client-facing notes — same auto-save behaviour, but these DO render in the
+  // proposal PDF (event.client_notes).
+  const [clientNotes, setClientNotes] = useState('');
+  const [clientNotesStatus, setClientNotesStatus] = useState('');
+  const clientNotesTimer = useRef(null);
+
   // Private file uploads (any type). Track an "uploading" flag for UI.
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -383,11 +389,18 @@ export default function DayBuilder() {
       clearTimeout(notesTimer.current);
       notesTimer.current = null;
     }
+    setClientNotes(event?.client_notes || '');
+    setClientNotesStatus('');
+    if (clientNotesTimer.current) {
+      clearTimeout(clientNotesTimer.current);
+      clientNotesTimer.current = null;
+    }
   }, [event?.id]);
 
-  // Flush the debounce timer on unmount (no leaks / late saves).
+  // Flush the debounce timers on unmount (no leaks / late saves).
   useEffect(() => () => {
     if (notesTimer.current) clearTimeout(notesTimer.current);
+    if (clientNotesTimer.current) clearTimeout(clientNotesTimer.current);
   }, []);
 
   // Update local notes immediately; debounce the persisted updateEvent.
@@ -398,6 +411,16 @@ export default function DayBuilder() {
     notesTimer.current = setTimeout(async () => {
       await updateEvent({ notes: value });
       setNotesStatus('saved');
+    }, 600);
+  };
+
+  const onClientNotesChange = (value) => {
+    setClientNotes(value);
+    setClientNotesStatus('saving');
+    if (clientNotesTimer.current) clearTimeout(clientNotesTimer.current);
+    clientNotesTimer.current = setTimeout(async () => {
+      await updateEvent({ client_notes: value });
+      setClientNotesStatus('saved');
     }, 600);
   };
 
@@ -692,6 +715,30 @@ export default function DayBuilder() {
             value={notes}
             onChange={(e) => onNotesChange(e.target.value)}
             placeholder="תזכורות, דגשים פנימיים…"
+            className={`${field} mt-2 resize-y`}
+          />
+        </div>
+
+        {/* Client-facing notes — these DO appear in the proposal PDF, right
+            before the closing band. */}
+        <div className="bg-white rounded-xl border border-slate-200 p-4 text-sm mb-4">
+          <div className="flex items-baseline justify-between gap-2">
+            <div>
+              <div className="font-medium">הערות ללקוח</div>
+              <div className="text-xs text-slate-400">מופיע בהצעה ובקובץ ה-PDF</div>
+            </div>
+            {clientNotesStatus && (
+              <span className="text-xs text-slate-400">
+                {clientNotesStatus === 'saving' ? 'נשמר…' : 'נשמר אוטומטית'}
+              </span>
+            )}
+          </div>
+          <textarea
+            dir="rtl"
+            rows={4}
+            value={clientNotes}
+            onChange={(e) => onClientNotesChange(e.target.value)}
+            placeholder="מה כלול ומה לא, נקודת מפגש, דגשים…"
             className={`${field} mt-2 resize-y`}
           />
         </div>
