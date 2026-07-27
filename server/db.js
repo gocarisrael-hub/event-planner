@@ -226,6 +226,11 @@ function migrate(d) {
       ev.notes = '';
       changed = true;
     }
+    // Client-facing note — unlike `notes`, this one DOES render in the PDF.
+    if (!('client_notes' in ev)) {
+      ev.client_notes = '';
+      changed = true;
+    }
     // אחראי (person in charge) — default to empty when missing.
     if (!('owner' in ev)) {
       ev.owner = '';
@@ -268,6 +273,17 @@ function migrate(d) {
     // Price type: per_person (default) or total (flat for the whole group).
     if (!('price_type' in it)) {
       it.price_type = 'per_person';
+      changed = true;
+    }
+    // Optional extra charged ONCE for the whole group on top of a per-head
+    // price (venue rental, a guide's fee…), plus a short label saying what it
+    // is. Both are shown to the client in the with-prices PDF.
+    if (!('fixed_cost' in it)) {
+      it.fixed_cost = null;
+      changed = true;
+    }
+    if (!('fixed_cost_note' in it)) {
+      it.fixed_cost_note = '';
       changed = true;
     }
   }

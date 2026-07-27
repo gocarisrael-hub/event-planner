@@ -83,6 +83,14 @@ export function priceRange(item) {
   return { low: Math.min(...prices), high: Math.max(...prices) };
 }
 
+// An item's optional extra FLAT cost — charged once for the whole group on top
+// of its per-head price (venue rental, a guide's fee…). 0 when unset/invalid,
+// so it's always safe to add. `fixed_cost_note` says what it is.
+export function fixedCost(item) {
+  const v = Number(item.fixed_cost);
+  return Number.isFinite(v) && v > 0 ? v : 0;
+}
+
 // Sum the schedule into a per-head price range by summing each item's
 // priceRange (so choice blocks span item.price + option prices).
 export function total(items) {
@@ -100,6 +108,8 @@ export function total(items) {
 //  - choice block (has options) → priceRange (item.price + option prices) × N.
 //  - plain item, price_type==='total' → a FLAT amount (NOT × N).
 //  - plain item, price_type==='per_person' (default) → priceRange × N.
+// Any item's `fixed_cost` is then added ONCE (never × N) — it's an extra flat
+// charge sitting alongside the per-head price, not part of it.
 // Returns the {low, high} sum across all items for the whole group.
 export function groupTotal(items, groupSize) {
   const n = Number(groupSize) > 0 ? Number(groupSize) : 0;
@@ -115,8 +125,18 @@ export function groupTotal(items, groupSize) {
       low += r.low * n;
       high += r.high * n;
     }
+    const fc = fixedCost(it);
+    low += fc;
+    high += fc;
   }
   return { low, high };
+}
+
+// Whether a schedule carries ANY money at all — a per-head price, an option
+// price, or a flat extra. Gates the totals bands, which must still show for a
+// day whose only cost is a fixed extra (where `total` is 0 by construction).
+export function hasPricing(items) {
+  return items.some((it) => priceRange(it).high > 0 || fixedCost(it) > 0);
 }
 
 // Per-person price range. With a group size, it's groupTotal / N (rounded to
