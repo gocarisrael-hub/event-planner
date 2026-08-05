@@ -822,3 +822,21 @@ export function proposalHtml(event, { prices, budget, photos, logo, cover, optio
 </body>
 </html>`;
 }
+
+// Shared with the Word export (server/docx/generate.js) so the .docx derives
+// its times, prices and totals from EXACTLY the same logic as the PDF — the two
+// formats can never drift apart on the numbers.
+export {
+  BRAND,
+  formatPrice,
+  formatRange,
+  formatDuration,
+  timingLabel,
+  sortByStart,
+  priceRange,
+  fixedCost,
+  hasPricing,
+  groupTotal,
+  perPerson,
+  whenLabel,
+};

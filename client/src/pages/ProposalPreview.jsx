@@ -8,17 +8,20 @@ export default function ProposalPreview() {
   const { id } = useParams();
   const [event, setEvent] = useState(null);
   const [showPrices, setShowPrices] = useState(false);
+  // Which file the download buttons produce: 'pdf' (final) or 'docx' (editable).
+  const [format, setFormat] = useState('pdf');
+  // false, or the extension currently being generated (drives the status text).
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => { api.getEvent(id).then(setEvent); }, [id]);
 
-  // Build a filesystem-safe PDF filename from the event title, distinguishing
-  // the with/without-prices variants. The a.download attribute below is what
-  // actually names the saved blob.
+  // Build a filesystem-safe filename from the event title, distinguishing the
+  // with/without-prices variants. The a.download attribute below is what
+  // actually names the saved blob. `ext` is 'pdf' or 'docx'.
   // `option` is 'A' or 'B' when downloading a single option's proposal (mirrors
   // the server, which inserts "אופציה א/ב" before the variant suffix).
-  const pdfFilename = (withPrices, withBudget, option = null) => {
+  const proposalFilename = (withPrices, withBudget, option = null, ext = 'pdf') => {
     const base = String(event?.title ?? '')
       .replace(/[/\\:*?"<>|\x00-\x1f]/g, ' ')
       .replace(/\s+/g, ' ')
@@ -26,20 +29,21 @@ export default function ProposalPreview() {
     const suffix = withPrices ? ' (עם מחירים)' : withBudget ? '' : ' (ללא תקציב)';
     const optionPart = option ? ` – אופציה ${option === 'B' ? 'ב' : 'א'}` : '';
     return base
-      ? `הצעה – ${base}${optionPart}${suffix}.pdf`
-      : `הצעה${optionPart}${suffix}.pdf`;
+      ? `הצעה – ${base}${optionPart}${suffix}.${ext}`
+      : `הצעה${optionPart}${suffix}.${ext}`;
   };
 
-  // Download the server-rendered PDF (clean A4 Hebrew) instead of printing.
+  // Download the server-rendered proposal instead of printing: 'pdf' (clean A4
+  // Hebrew, final) or 'docx' (the same proposal, editable in Word).
   // Three variants: with prices / no prices (with budget) / no prices, no budget.
   // When `option` ('A'/'B') is passed, downloads only that option's proposal.
-  const downloadPdf = async (withPrices, withBudget = true, option = null) => {
+  const download = async (withPrices, withBudget = true, option = null, ext = 'pdf') => {
     setError('');
-    setPending(true);
+    setPending(ext);
     try {
       const optionQuery = option ? `&option=${option}` : '';
       const res = await fetch(
-        `/api/events/${id}/proposal.pdf?prices=${withPrices}&budget=${withBudget}${optionQuery}`,
+        `/api/events/${id}/proposal.${ext}?prices=${withPrices}&budget=${withBudget}${optionQuery}`,
         { headers: authHeaders() },
       );
       if (!res.ok) {
@@ -56,17 +60,21 @@ export default function ProposalPreview() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = pdfFilename(withPrices, withBudget, option);
+      a.download = proposalFilename(withPrices, withBudget, option, ext);
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setError(`יצירת ה-PDF נכשלה — ${e.message}`);
+      setError(`יצירת ה-${ext === 'docx' ? 'Word' : 'PDF'} נכשלה — ${e.message}`);
     } finally {
       setPending(false);
     }
   };
+
+  // The variant buttons download whichever format is currently selected.
+  const downloadProposal = (withPrices, withBudget = true, option = null) =>
+    download(withPrices, withBudget, option, format);
 
   if (!event) return <p className="p-8 text-slate-400">טוען…</p>;
 
@@ -99,10 +107,33 @@ export default function ProposalPreview() {
         <Link to={`/day/${id}`} className="text-sm text-slate-400 hover:text-ocar">← חזרה לבנייה</Link>
         <div className="flex items-center gap-2 mr-auto">
           {error && <span className="text-sm text-red-500">{error}</span>}
-          {pending && <span className="text-sm text-slate-400">יוצר PDF…</span>}
+          {pending && (
+            <span className="text-sm text-slate-400">
+              יוצר {pending === 'docx' ? 'Word' : 'PDF'}…
+            </span>
+          )}
+
+          {/* Output format — the same three variants below are produced either
+              as a final PDF or as an editable Word document. */}
+          <div className="flex rounded-lg border border-slate-200 p-0.5 text-sm">
+            {[
+              { value: 'pdf', label: 'PDF' },
+              { value: 'docx', label: 'Word' },
+            ].map(({ value, label }) => (
+              <button
+                key={value}
+                onClick={() => setFormat(value)}
+                className={`px-3 py-1.5 rounded-md font-medium transition-colors ${
+                  format === value ? 'bg-ocar text-white' : 'text-slate-500 hover:text-ocar'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           {event.options_mode === true ? (
             // A/B options mode: a separate labeled group per option, each
-            // downloading THAT option's PDF as a normal single-schedule proposal.
+            // downloading THAT option as a normal single-schedule proposal.
             <div className="flex items-center gap-4">
               {[
                 { option: 'A', label: 'אופציה א' },
@@ -110,13 +141,13 @@ export default function ProposalPreview() {
               ].map(({ option, label }) => (
                 <div key={option} className="flex items-center gap-2">
                   <span className="text-sm font-bold text-slate-500">{label}:</span>
-                  <button onClick={() => downloadPdf(false, true, option)} disabled={pending} className="bg-ocar text-white px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
+                  <button onClick={() => downloadProposal(false, true, option)} disabled={pending} className="bg-ocar text-white px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
                     בלי מחירים
                   </button>
-                  <button onClick={() => downloadPdf(false, false, option)} disabled={pending} className="border border-ocar text-ocar px-3 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
+                  <button onClick={() => downloadProposal(false, false, option)} disabled={pending} className="border border-ocar text-ocar px-3 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
                     בלי מחירים ובלי תקציב
                   </button>
-                  <button onClick={() => downloadPdf(true, true, option)} disabled={pending} className="border border-ocar text-ocar px-3 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
+                  <button onClick={() => downloadProposal(true, true, option)} disabled={pending} className="border border-ocar text-ocar px-3 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
                     עם מחירים
                   </button>
                 </div>
@@ -124,13 +155,13 @@ export default function ProposalPreview() {
             </div>
           ) : (
             <>
-              <button onClick={() => downloadPdf(false, true)} disabled={pending} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
+              <button onClick={() => downloadProposal(false, true)} disabled={pending} className="bg-ocar text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
                 בלי מחירים
               </button>
-              <button onClick={() => downloadPdf(false, false)} disabled={pending} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
+              <button onClick={() => downloadProposal(false, false)} disabled={pending} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
                 בלי מחירים ובלי תקציב
               </button>
-              <button onClick={() => downloadPdf(true, true)} disabled={pending} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
+              <button onClick={() => downloadProposal(true, true)} disabled={pending} className="border border-ocar text-ocar px-4 py-2 rounded-lg text-sm font-medium hover:bg-ocar-soft disabled:opacity-50 disabled:cursor-not-allowed">
                 עם מחירים
               </button>
             </>
