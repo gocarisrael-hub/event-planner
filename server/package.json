@@ -9,11 +9,15 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "docx": "^9.7.1",
     "express": "^4.19.2",
     "googleapis": "^173.0.0",
     "jimp": "^1.6.1",
     "multer": "^2.0.0",
     "pdf-lib": "^1.17.1",
     "puppeteer": "^25.1.0"
+  },
+  "devDependencies": {
+    "jszip": "^3.10.1"
   }
 }

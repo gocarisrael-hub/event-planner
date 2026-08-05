@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { Router } from 'express';
 import multer from 'multer';
 import { catalog, events, items, users } from '../db.js';
+import { generateProposalDocx } from '../docx/generate.js';
 import { generateProposalPdf } from '../pdf/generate.js';
 
 const router = Router();
@@ -92,19 +93,18 @@ router.get('/:id', (req, res) => {
   res.json(withItems(event));
 });
 
-// In-app proposal PDF download (no addon key). Renders a clean A4 Hebrew PDF.
-router.get('/:id/proposal.pdf', async (req, res) => {
-  const event = events.find(req.params.id);
-  if (!event) return res.status(404).json({ error: 'not found' });
-
-  const prices = req.query.prices === 'true';
+// Resolve the shared proposal request options (variant flags + per-option
+// filtering) used by BOTH the PDF and Word exports, so the two formats always
+// render exactly the same content for the same query string.
+function proposalRequest(event, query) {
+  const prices = query.prices === 'true';
   // In no-prices mode the per-person budget band shows unless budget=false.
-  const budget = req.query.budget !== 'false';
+  const budget = query.budget !== 'false';
 
   // Per-option export: when the event is in A/B options mode and ?option=A|B is
   // given, render ONLY that option as a normal single-schedule proposal (not the
   // stacked both-options layout). Option A = items where option !== 'B'.
-  const optionParam = req.query.option === 'A' || req.query.option === 'B' ? req.query.option : null;
+  const optionParam = query.option === 'A' || query.option === 'B' ? query.option : null;
   const applyOption = optionParam && event.options_mode === true;
   // The Hebrew label shown on the cover badge / in the filename.
   const optionLabel = applyOption ? (optionParam === 'B' ? 'ב' : 'א') : null;
@@ -115,9 +115,35 @@ router.get('/:id/proposal.pdf', async (req, res) => {
       optionParam === 'B' ? it.option === 'B' : it.option !== 'B',
     );
     // Shallow copy with only this option's items and options_mode off, so the
-    // template renders a normal single schedule instead of the stacked sections.
+    // renderer produces a normal single schedule instead of the stacked sections.
     renderEvent = { ...renderEvent, items: filtered, options_mode: false };
   }
+  return { prices, budget, optionLabel, renderEvent };
+}
+
+// Build a filesystem-safe name from the event title, distinguishing the
+// with/without-prices variants — mirrors the client's a.download scheme.
+function proposalFilename(event, { prices, budget, optionLabel, ext }) {
+  const base = String(event.title || '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[/\\:*?"<>|\x00-\x1f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  // Three variants: with prices / no prices (with budget) / no prices, no budget.
+  const suffix = prices ? ' (עם מחירים)' : budget ? '' : ' (ללא תקציב)';
+  // When exporting a single option, insert "אופציה א/ב" before the variant suffix.
+  const optionPart = optionLabel ? ` – אופציה ${optionLabel}` : '';
+  return base
+    ? `הצעה – ${base}${optionPart}${suffix}.${ext}`
+    : `הצעה${optionPart}${suffix}.${ext}`;
+}
+
+// In-app proposal PDF download (no addon key). Renders a clean A4 Hebrew PDF.
+router.get('/:id/proposal.pdf', async (req, res) => {
+  const event = events.find(req.params.id);
+  if (!event) return res.status(404).json({ error: 'not found' });
+
+  const { prices, budget, optionLabel, renderEvent } = proposalRequest(event, req.query);
 
   let pdfBuffer;
   try {
@@ -128,22 +154,9 @@ router.get('/:id/proposal.pdf', async (req, res) => {
       .json({ error: 'pdf_unavailable', message: String(err.message || err) });
   }
 
-  // Build a filesystem-safe name from the event title, distinguishing the
-  // with/without-prices variants — mirrors the client's a.download scheme.
   // UTF-8 filename* carries the real (Hebrew) name; the plain ASCII filename
   // is a safe fallback for clients that don't support RFC 5987.
-  const base = String(event.title || '')
-    // eslint-disable-next-line no-control-regex
-    .replace(/[/\\:*?"<>|\x00-\x1f]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  // Three variants: with prices / no prices (with budget) / no prices, no budget.
-  const suffix = prices ? ' (עם מחירים)' : budget ? '' : ' (ללא תקציב)';
-  // When exporting a single option, insert "אופציה א/ב" before the variant suffix.
-  const optionPart = optionLabel ? ` – אופציה ${optionLabel}` : '';
-  const name = base
-    ? `הצעה – ${base}${optionPart}${suffix}.pdf`
-    : `הצעה${optionPart}${suffix}.pdf`;
+  const name = proposalFilename(event, { prices, budget, optionLabel, ext: 'pdf' });
   const utf8Name = encodeURIComponent(name);
   res.set('Content-Type', 'application/pdf');
   res.set(
@@ -151,6 +164,38 @@ router.get('/:id/proposal.pdf', async (req, res) => {
     `attachment; filename="proposal.pdf"; filename*=UTF-8''${utf8Name}`,
   );
   res.send(pdfBuffer);
+});
+
+// The same proposal as an EDITABLE Word document. Same query string as the PDF
+// route (prices / budget / option), same content and same money — only the
+// medium differs. Note: unlike the PDF, catalog file attachments are NOT
+// appended (a .docx can't absorb arbitrary PDFs page-for-page).
+router.get('/:id/proposal.docx', async (req, res) => {
+  const event = events.find(req.params.id);
+  if (!event) return res.status(404).json({ error: 'not found' });
+
+  const { prices, budget, optionLabel, renderEvent } = proposalRequest(event, req.query);
+
+  let docxBuffer;
+  try {
+    docxBuffer = await generateProposalDocx(renderEvent, { prices, budget, option: optionLabel });
+  } catch (err) {
+    return res
+      .status(503)
+      .json({ error: 'docx_unavailable', message: String(err.message || err) });
+  }
+
+  const name = proposalFilename(event, { prices, budget, optionLabel, ext: 'docx' });
+  const utf8Name = encodeURIComponent(name);
+  res.set(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  );
+  res.set(
+    'Content-Disposition',
+    `attachment; filename="proposal.docx"; filename*=UTF-8''${utf8Name}`,
+  );
+  res.send(docxBuffer);
 });
 
 router.patch('/:id', (req, res) => {

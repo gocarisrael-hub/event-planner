@@ -252,6 +252,59 @@ async function getBrowser() {
   return browserPromise;
 }
 
+// Decode an image Jimp can't read (notably WebP) by handing it to Chromium —
+// which renders every format the browser supports — and re-encoding it as JPEG
+// through a canvas. Used by the Word export, whose .docx container accepts only
+// jpg/png/gif/bmp/svg, so a WebP photo would otherwise be lost. `square` cover-
+// crops to a box the way CSS object-fit: cover does; otherwise the image is
+// only downscaled to `maxWidthPx`. Returns { data, width, height }.
+// Throws if Chromium is unavailable — callers treat that as "skip this photo".
+export async function jpegViaChromium(buffer, mime, { square = 0, maxWidthPx = 0 } = {}) {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+  try {
+    const uri = `data:${mime};base64,${buffer.toString('base64')}`;
+    const out = await page.evaluate(
+      async (src, box, maxW) => {
+        const img = new Image();
+        img.src = src;
+        await img.decode();
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (box) {
+          // Cover-crop: scale so the shorter side fills the box, center the rest.
+          canvas.width = box;
+          canvas.height = box;
+          const scale = Math.max(box / img.naturalWidth, box / img.naturalHeight);
+          const w = img.naturalWidth * scale;
+          const h = img.naturalHeight * scale;
+          ctx.drawImage(img, (box - w) / 2, (box - h) / 2, w, h);
+        } else {
+          const scale = maxW && img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
+          canvas.width = Math.round(img.naturalWidth * scale);
+          canvas.height = Math.round(img.naturalHeight * scale);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+        return {
+          dataUrl: canvas.toDataURL('image/jpeg', 0.8),
+          width: canvas.width,
+          height: canvas.height,
+        };
+      },
+      uri,
+      square,
+      maxWidthPx,
+    );
+    return {
+      data: Buffer.from(out.dataUrl.slice(out.dataUrl.indexOf(',') + 1), 'base64'),
+      width: out.width,
+      height: out.height,
+    };
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
 export async function generateProposalPdf(event, { prices, budget = true, option = null } = { prices: false, budget: true, option: null }) {
   // Pre-resize/encode all photos before rendering so the PDF embeds small
   // JPEGs instead of full-size originals.
