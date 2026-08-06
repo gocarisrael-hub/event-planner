@@ -22,16 +22,23 @@ const paragraphs = (xml) => xml.split('</w:p>').slice(0, -1);
 const textRuns = (xml) =>
   [...xml.matchAll(/<w:r>(.*?)<\/w:r>/gs)].map((m) => m[1]).filter((r) => r.includes('<w:t'));
 
+// Bidi embedding controls are invisible formatting, not content — strip them so
+// assertions read against the text a person actually sees.
+const stripBidi = (s) => s.replace(/[‎‏‪-‮⁦-⁩]/g, '');
+
 const runText = (run) =>
-  [...run.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join('');
+  stripBidi([...run.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join(''));
 
 const isLtrRun = (run) => run.includes('<w:rtl w:val="false"/>');
 
 const hasHebrew = (s) => /[֐-׿]/.test(s);
 
 // The text of a paragraph chunk.
+// All visible text of the document, bidi controls removed.
+const docText = (xml) => stripBidi(xml.replace(/<[^>]+>/g, ''));
+
 const paraText = (para) =>
-  [...para.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join('');
+  stripBidi([...para.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join(''));
 
 const baseEvent = {
   title: 'יום גיבוש',
@@ -78,23 +85,42 @@ test('every Hebrew paragraph declares RTL base direction (w:bidi)', async () => 
   assert.deepStrictEqual(missing.map(paraText), [], 'Hebrew paragraphs must carry w:bidi');
 });
 
-test('alignment is stated visually, never as start/end', async () => {
+test('Hebrew paragraphs carry no explicit alignment', async () => {
   const xml = await docXml(baseEvent, { prices: true });
-  // "start"/"end" are not honoured by every renderer — they fall back to left,
-  // which drags every Hebrew line to the wrong edge of the page.
-  assert.ok(!xml.includes('w:val="start"'), 'no w:jc val="start"');
-  assert.ok(!xml.includes('w:val="end"'), 'no w:jc val="end"');
-});
-
-test('Hebrew paragraphs are pinned to the right edge', async () => {
-  const xml = await docXml(baseEvent, { prices: true });
+  // w:jc is LOGICAL inside a bidi paragraph: "right" means "end", i.e. the
+  // visual LEFT. The bidi default (start) is the right edge, so Hebrew
+  // paragraphs must state nothing at all. Regression guard: an earlier version
+  // added w:jc right here and pushed every Hebrew line to the wrong edge.
   const wrong = paragraphs(xml).filter((p) => {
     const text = paraText(p).trim();
     if (!text || !hasHebrew(text)) return false;
     if (p.includes('<w:jc w:val="center"/>')) return false; // the closing CTA
-    return !p.includes('<w:jc w:val="right"/>');
+    return /<w:jc /.test(p);
   });
-  assert.deepStrictEqual(wrong.map(paraText), [], 'Hebrew paragraphs must be right-aligned');
+  assert.deepStrictEqual(wrong.map(paraText), [], 'Hebrew paragraphs must not set w:jc');
+});
+
+test('the LTR paragraphs (totals figures) are pinned left', async () => {
+  const xml = await docXml(baseEvent, { prices: true });
+  // A totals figure has to land opposite its Hebrew label. It gets a NON-bidi
+  // paragraph, where "left" is the visual left under both readings of w:jc.
+  // (Item prices stay bidi — they can carry a Hebrew "סה״כ · הסעה" tag.)
+  const ltrParas = paragraphs(xml).filter((p) => paraText(p).trim() && !p.includes('<w:bidi/>'));
+  assert.ok(ltrParas.length > 0, 'expected LTR money paragraphs');
+  for (const para of ltrParas) {
+    assert.ok(para.includes('<w:jc w:val="left"/>'), `must be left-pinned: ${paraText(para)}`);
+    assert.ok(!hasHebrew(paraText(para)), `must hold no Hebrew: ${paraText(para)}`);
+  }
+});
+
+test('LTR fragments are wrapped in bidi embedding controls', async () => {
+  const xml = await docXml(baseEvent, { prices: true });
+  // rightToLeft:false marks letters LTR but leaves "₪" and digits to resolve
+  // against the RTL paragraph — "₪50" renders as "50₪" without an embedding.
+  const raw = [...xml.matchAll(/<w:r>(.*?)<\/w:r>/gs)].map((m) => m[1]);
+  const price = raw.find((r) => /<w:t[^>]*>[^<]*₪50/.test(r));
+  assert.ok(price, 'expected a price run');
+  assert.ok(price.includes('‪') && price.includes('‬'), 'price must be LRE…PDF wrapped');
 });
 
 test('every text run states its direction explicitly', async () => {
@@ -176,7 +202,7 @@ test('a multi-line description becomes one paragraph per line', async () => {
 
 test('schedule content, contacts and notes are present', async () => {
   const xml = await docXml(baseEvent, { prices: true });
-  const text = xml.replace(/<[^>]+>/g, '');
+  const text = docText(xml);
   assert.ok(text.includes('יום גיבוש'), 'title');
   assert.ok(text.includes('הלו״ז ליום'), 'schedule heading');
   assert.ok(text.includes('עגלת קפה'), 'item title');
@@ -191,7 +217,7 @@ test('schedule content, contacts and notes are present', async () => {
 });
 
 test('prices mode shows prices, the flat extra and the totals', async () => {
-  const text = (await docXml(baseEvent, { prices: true })).replace(/<[^>]+>/g, '');
+  const text = docText(await docXml(baseEvent, { prices: true }));
   assert.ok(text.includes('₪50'), 'per-head price');
   assert.ok(text.includes('+ ₪800'), 'flat extra');
   assert.ok(text.includes('הסעה'), 'what the flat extra covers');
@@ -200,7 +226,7 @@ test('prices mode shows prices, the flat extra and the totals', async () => {
 });
 
 test('no-prices mode hides every price and shows the budget instead', async () => {
-  const text = (await docXml(baseEvent, { prices: false, budget: true })).replace(/<[^>]+>/g, '');
+  const text = docText(await docXml(baseEvent, { prices: false, budget: true }));
   assert.ok(!text.includes('₪50'), 'item price must be hidden');
   assert.ok(!text.includes('₪800'), 'flat extra must be hidden');
   assert.ok(!text.includes('מחיר לאדם'), 'totals must be hidden');
@@ -209,13 +235,13 @@ test('no-prices mode hides every price and shows the budget instead', async () =
 });
 
 test('budget=false drops the budget band too', async () => {
-  const text = (await docXml(baseEvent, { prices: false, budget: false })).replace(/<[^>]+>/g, '');
+  const text = docText(await docXml(baseEvent, { prices: false, budget: false }));
   assert.ok(!text.includes('תקציב לאדם'), 'budget band must be hidden');
   assert.ok(text.includes('נשמח לעמוד לרשותכם'), 'the closing CTA still shows');
 });
 
 test('a single-option export carries the אופציה badge', async () => {
-  const text = (await docXml(baseEvent, { prices: false, option: 'ב' })).replace(/<[^>]+>/g, '');
+  const text = docText(await docXml(baseEvent, { prices: false, option: 'ב' }));
   assert.ok(text.includes('אופציה ב'), 'option badge');
 });
 
@@ -228,7 +254,7 @@ test('options mode stacks a labeled section per option with its own total', asyn
       { ...baseEvent.items[1], option: 'B', options: [] },
     ],
   };
-  const text = (await docXml(event, { prices: true })).replace(/<[^>]+>/g, '');
+  const text = docText(await docXml(event, { prices: true }));
   assert.ok(text.includes('אופציה א'), 'section A heading');
   assert.ok(text.includes('אופציה ב'), 'section B heading');
   assert.ok(text.includes('מחיר לאדם · אופציה א'), 'per-section total A');
@@ -236,7 +262,7 @@ test('options mode stacks a labeled section per option with its own total', asyn
 });
 
 test('an event with no items still produces a valid document', async () => {
-  const text = (await docXml({ title: 'ריק', items: [] }, { prices: true })).replace(/<[^>]+>/g, '');
+  const text = docText(await docXml({ title: 'ריק', items: [] }, { prices: true }));
   assert.ok(text.includes('ריק'), 'title');
   assert.ok(text.includes('הלו״ז ליום'), 'schedule heading');
 });

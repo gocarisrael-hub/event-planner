@@ -6,20 +6,21 @@
 // carries an explicit direction, so RTL is stated, never inferred.
 //
 // RTL RULES OBSERVED THROUGHOUT THIS FILE:
-//   1. Every Hebrew paragraph is `bidirectional: true` (w:bidi) — RTL base
-//      direction — AND explicitly right-aligned. The direction-relative
-//      alignments (w:jc "start"/"end") are NOT reliable: several renderers
-//      don't recognise them and silently fall back to left, which drags every
-//      Hebrew line to the wrong edge. Only "right"/"left" are honoured
-//      everywhere, so this file always states the visual edge.
+//   1. Every Hebrew paragraph is `bidirectional: true` (w:bidi) and carries NO
+//      explicit alignment. In a bidi paragraph w:jc is LOGICAL, not visual:
+//      "right" means "end", which puts the text on the visual LEFT. The default
+//      (start) is the right edge, and omitting w:jc is what Word itself writes
+//      for a Hebrew document. Do not "fix" a left-hugging paragraph by adding
+//      w:jc right — that is what caused it.
 //   2. Every Hebrew run is `rightToLeft: true` (w:rtl).
 //   3. Every purely numeric/Latin fragment — prices, times, phone numbers,
-//      dates, "(×40)", the e-mail address — is emitted as its OWN run with
-//      `rightToLeft: false`, which isolates it exactly like <bdi> does in the
-//      HTML template. Without this, "₪120–₪150" and "09:00–10:30" render with
-//      the two halves swapped. This applies to free text too (see `richHe`):
-//      a planner writing "7:30-10:30" inside a description would otherwise see
-//      it come out as "10:30-7:30".
+//      dates, "(×40)", the e-mail address — is emitted as its OWN run, wrapped
+//      in LRE…PDF so it is genuinely isolated, exactly like <bdi> in the HTML
+//      template. `rightToLeft: false` alone does NOT do this: it marks letters
+//      LTR but leaves digits and neutrals to resolve against the paragraph, so
+//      "₪120–₪150" comes out as "120₪–150₪". This applies to free text too (see
+//      `richHe`): a planner writing "7:30-10:30" in a description would
+//      otherwise read it back as "10:30-7:30".
 //   4. Money VALUES sit in LTR paragraphs pinned to the left edge, so the
 //      figure lands on the opposite side from its Hebrew label under every
 //      renderer's reading of the alignment attributes.
@@ -149,11 +150,33 @@ const SZ = {
 };
 
 // --- run helpers ------------------------------------------------------------
+// Bidi controls.
+//
+// LRE…POP wraps an LTR fragment as an independent embedding — the <bdi>
+// equivalent. `rightToLeft: false` alone would not do it: it marks the run's
+// LETTERS as LTR but leaves digits and neutrals — "₪" is a currency terminator
+// with no strong direction — to resolve against the paragraph.
+//
+// RLM is a zero-width strong RTL character. Every Hebrew run opens with one so
+// that leading neutrals (" · ", "+ ") anchor to RTL instead of joining whatever
+// preceded them. Without it, "10:30–14:30" followed by "   ·   4 שעות" rendered
+// with the "4" torn off its Hebrew word and pulled next to the time: the
+// neutrals between them resolved LTR, so the bare digit joined the time's chunk.
+//
+// Embedding the Hebrew runs too (RLE…POP) is NOT the answer — it reorders the
+// runs themselves, putting the time on the wrong side of its own line.
+const LRE = '‪'; // U+202A start an LTR embedding
+const POP = '‬'; // U+202C end the embedding
+const RLM = '‏'; // U+200F zero-width strong RTL
+
 // Hebrew/RTL run. Everything that is prose goes through here.
-const he = (text, opts = {}) => new TextRun({ text, rightToLeft: true, font: 'Arial', ...opts });
-// LTR-isolated run — the <bdi> equivalent. Use for prices, times, dates, phone
-// numbers and any parenthesised number, so bidi reordering can't scramble them.
-const ltr = (text, opts = {}) => new TextRun({ text, rightToLeft: false, font: 'Arial', ...opts });
+const he = (text, opts = {}) =>
+  new TextRun({ text: `${RLM}${text}`, rightToLeft: true, font: 'Arial', ...opts });
+
+// LTR run — the <bdi> equivalent. Use for prices, times, dates, phone numbers
+// and any parenthesised number.
+const ltr = (text, opts = {}) =>
+  new TextRun({ text: `${LRE}${text}${POP}`, rightToLeft: false, font: 'Arial', ...opts });
 
 // Latin/numeric fragments inside otherwise-Hebrew free text: a token starts on a
 // letter or digit and may carry internal separators, so "7:30-10:30", "3.8.2026"
@@ -185,13 +208,17 @@ function richHe(text, opts = {}) {
   return runs.length ? runs : [he(s, opts)];
 }
 
-// Hebrew paragraph: RTL base direction, pinned to the right edge. See rule 1 —
-// the alignment is stated visually because "start" is not portable.
+// Hebrew paragraph: RTL base direction, no explicit alignment. See rule 1 — in
+// a bidi paragraph w:jc is LOGICAL, so "right" means "end", which lands the text
+// on the visual LEFT. Omitting it leaves the default (start = the right edge in
+// RTL), which is exactly what Word itself writes for a Hebrew document.
 const p = (children, opts = {}) =>
-  new Paragraph({ bidirectional: true, alignment: AlignmentType.RIGHT, children, ...opts });
+  new Paragraph({ bidirectional: true, children, ...opts });
 
 // LTR paragraph pinned to the left edge — used for money values, which must land
-// on the opposite side of the row from their Hebrew label.
+// on the opposite side of the row from their Hebrew label. Here the paragraph is
+// NOT bidi, so w:jc "left" means the visual left under both the logical and the
+// absolute reading of the attribute.
 const pLtr = (children, opts = {}) =>
   new Paragraph({ bidirectional: false, alignment: AlignmentType.LEFT, children, ...opts });
 
@@ -583,7 +610,7 @@ function optionBlocks(o, { showPrices, images }) {
 // A two-column money row: Hebrew label pinned right, figure pinned left.
 // `label` is either a string or a ready-made array of runs — the group row needs
 // the latter, because "(×27)" must be its own LTR run inside a Hebrew label.
-function moneyRow(label, valueText, { labelSize, valueSize, valueColor, before = 0, topBorder = null }) {
+function moneyRow(label, valueText, { labelSize, valueSize, valueColor, before = 0, topBorder = null, keepNext = false }) {
   const half = Math.floor(CONTENT / 2);
   const labelRuns = Array.isArray(label)
     ? label
@@ -601,9 +628,9 @@ function moneyRow(label, valueText, { labelSize, valueSize, valueColor, before =
       new TableRow({
         cantSplit: true,
         children: [
-          cell([p(labelRuns, { spacing: { before } })], half, borders),
+          cell([p(labelRuns, { spacing: { before }, keepNext })], half, borders),
           cell(
-            [pLtr([ltr(valueText, { bold: true, size: valueSize, color: valueColor })], { spacing: { before } })],
+            [pLtr([ltr(valueText, { bold: true, size: valueSize, color: valueColor })], { spacing: { before }, keepNext })],
             CONTENT - half,
             borders,
           ),
@@ -614,7 +641,9 @@ function moneyRow(label, valueText, { labelSize, valueSize, valueColor, before =
   );
 }
 
-// Per-person + group totals for a set of items.
+// Per-person + group totals for a set of items. `strong` is the closing band,
+// which is kept with the CTA that follows it so the two can't be split across a
+// page break — a lone CTA on an otherwise empty last page looks unfinished.
 function totalsBlocks(items, groupSize, label, { strong = false } = {}) {
   const pp = perPerson(items, groupSize);
   const g = groupTotal(items, groupSize);
@@ -625,6 +654,7 @@ function totalsBlocks(items, groupSize, label, { strong = false } = {}) {
       valueColor: RED_DEEP,
       before: 80,
       topBorder: { size: strong ? 24 : 8, color: strong ? RED : LINE },
+      keepNext: strong,
     }),
   ];
   if (groupSize > 0) {
@@ -637,7 +667,7 @@ function totalsBlocks(items, groupSize, label, { strong = false } = {}) {
           ltr(`(×${groupSize})`, { bold: true, size: SZ.groupRow, color: INK }),
         ],
         formatRange(g.low, g.high),
-        { labelSize: SZ.groupRow, valueSize: SZ.groupRow, valueColor: INK, before: 60 },
+        { labelSize: SZ.groupRow, valueSize: SZ.groupRow, valueColor: INK, before: 60, keepNext: strong },
       ),
     );
   }
@@ -690,6 +720,7 @@ function closingBlocks(event, { showPrices, showBudget, optionsMode, groupSize }
           valueColor: RED_DEEP,
           before: 80,
           topBorder: { size: 24, color: RED },
+          keepNext: true,
         }),
         spacer(6),
       );
@@ -786,7 +817,7 @@ export async function generateProposalDocx(
       default: {
         document: {
           run: { font: 'Arial', size: SZ.desc, color: INK_2, rightToLeft: true },
-          paragraph: { bidirectional: true, alignment: AlignmentType.RIGHT, spacing: { line: 300 } },
+          paragraph: { bidirectional: true, spacing: { line: 300 } },
         },
       },
     },
