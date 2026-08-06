@@ -27,6 +27,12 @@ const runText = (run) =>
 
 const isLtrRun = (run) => run.includes('<w:rtl w:val="false"/>');
 
+const hasHebrew = (s) => /[֐-׿]/.test(s);
+
+// The text of a paragraph chunk.
+const paraText = (para) =>
+  [...para.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join('');
+
 const baseEvent = {
   title: 'יום גיבוש',
   client_name: 'אלביט',
@@ -64,10 +70,31 @@ const baseEvent = {
   ],
 };
 
-test('every paragraph declares RTL base direction (w:bidi)', async () => {
+test('every Hebrew paragraph declares RTL base direction (w:bidi)', async () => {
   const xml = await docXml(baseEvent, { prices: true });
-  const missing = paragraphs(xml).filter((p) => !p.includes('<w:bidi/>'));
-  assert.strictEqual(missing.length, 0, `${missing.length} paragraph(s) without w:bidi`);
+  // Money-value paragraphs are LTR by design (see rule 4); everything carrying
+  // Hebrew must be bidi.
+  const missing = paragraphs(xml).filter((p) => hasHebrew(paraText(p)) && !p.includes('<w:bidi/>'));
+  assert.deepStrictEqual(missing.map(paraText), [], 'Hebrew paragraphs must carry w:bidi');
+});
+
+test('alignment is stated visually, never as start/end', async () => {
+  const xml = await docXml(baseEvent, { prices: true });
+  // "start"/"end" are not honoured by every renderer — they fall back to left,
+  // which drags every Hebrew line to the wrong edge of the page.
+  assert.ok(!xml.includes('w:val="start"'), 'no w:jc val="start"');
+  assert.ok(!xml.includes('w:val="end"'), 'no w:jc val="end"');
+});
+
+test('Hebrew paragraphs are pinned to the right edge', async () => {
+  const xml = await docXml(baseEvent, { prices: true });
+  const wrong = paragraphs(xml).filter((p) => {
+    const text = paraText(p).trim();
+    if (!text || !hasHebrew(text)) return false;
+    if (p.includes('<w:jc w:val="center"/>')) return false; // the closing CTA
+    return !p.includes('<w:jc w:val="right"/>');
+  });
+  assert.deepStrictEqual(wrong.map(paraText), [], 'Hebrew paragraphs must be right-aligned');
 });
 
 test('every text run states its direction explicitly', async () => {
@@ -118,6 +145,33 @@ test('Hebrew keeps its weight and size (complex-script properties)', async () =>
     (xml.match(/<w:szCs /g) || []).length,
     'every sized run needs the complex-script size too',
   );
+});
+
+test('numbers inside free text are LTR-isolated', async () => {
+  // A planner typing "7:30-10:30" in a description would otherwise read it back
+  // as "10:30-7:30" — bidi reorders the two halves inside an RTL run.
+  const event = {
+    ...baseEvent,
+    items: [{ ...baseEvent.items[0], description: 'שעות הארוחה 7:30-10:30 באולם' }],
+  };
+  const xml = await docXml(event, { prices: false });
+  const token = textRuns(xml).find((r) => runText(r).includes('7:30-10:30'));
+  assert.ok(token, 'expected the time range to survive as one run');
+  assert.ok(isLtrRun(token), 'the time range must be its own LTR run');
+  assert.strictEqual(runText(token), '7:30-10:30', 'no Hebrew may share that run');
+});
+
+test('a multi-line description becomes one paragraph per line', async () => {
+  const event = {
+    ...baseEvent,
+    items: [{ ...baseEvent.items[0], description: 'שורה ראשונה\n\nשורה שנייה\n' }],
+  };
+  const xml = await docXml(event, { prices: false });
+  const texts = paragraphs(xml).map(paraText);
+  assert.ok(texts.includes('שורה ראשונה'), 'first line is its own paragraph');
+  assert.ok(texts.includes('שורה שנייה'), 'second line is its own paragraph');
+  // Blank lines are dropped rather than left as empty gaps.
+  assert.ok(!texts.some((t) => t === 'שורה ראשונה\n\nשורה שנייה'), 'lines must not run together');
 });
 
 test('schedule content, contacts and notes are present', async () => {

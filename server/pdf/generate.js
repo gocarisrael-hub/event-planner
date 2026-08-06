@@ -256,10 +256,11 @@ async function getBrowser() {
 // which renders every format the browser supports — and re-encoding it as JPEG
 // through a canvas. Used by the Word export, whose .docx container accepts only
 // jpg/png/gif/bmp/svg, so a WebP photo would otherwise be lost. `square` cover-
-// crops to a box the way CSS object-fit: cover does; otherwise the image is
-// only downscaled to `maxWidthPx`. Returns { data, width, height }.
+// crops to a box the way CSS object-fit: cover does, `cover` does the same to an
+// explicit {w,h} band; otherwise the image is only downscaled to `maxWidthPx`.
+// Returns { data, width, height }.
 // Throws if Chromium is unavailable — callers treat that as "skip this photo".
-export async function jpegViaChromium(buffer, mime, { square = 0, maxWidthPx = 0 } = {}) {
+export async function jpegViaChromium(buffer, mime, { square = 0, cover = null, maxWidthPx = 0 } = {}) {
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
@@ -273,12 +274,12 @@ export async function jpegViaChromium(buffer, mime, { square = 0, maxWidthPx = 0
         const ctx = canvas.getContext('2d');
         if (box) {
           // Cover-crop: scale so the shorter side fills the box, center the rest.
-          canvas.width = box;
-          canvas.height = box;
-          const scale = Math.max(box / img.naturalWidth, box / img.naturalHeight);
+          canvas.width = box.w;
+          canvas.height = box.h;
+          const scale = Math.max(box.w / img.naturalWidth, box.h / img.naturalHeight);
           const w = img.naturalWidth * scale;
           const h = img.naturalHeight * scale;
-          ctx.drawImage(img, (box - w) / 2, (box - h) / 2, w, h);
+          ctx.drawImage(img, (box.w - w) / 2, (box.h - h) / 2, w, h);
         } else {
           const scale = maxW && img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
           canvas.width = Math.round(img.naturalWidth * scale);
@@ -292,7 +293,7 @@ export async function jpegViaChromium(buffer, mime, { square = 0, maxWidthPx = 0
         };
       },
       uri,
-      square,
+      cover || (square ? { w: square, h: square } : null),
       maxWidthPx,
     );
     return {
